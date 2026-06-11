@@ -24,7 +24,12 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: Search.pak
-          path: launch.sh config.json bin/
+          path: |
+            launch.sh
+            config.json
+            pak.json
+            bin
+            pak.json
       - name: Post Beta link
         env:
           GH_TOKEN: ${{ github.token }}
