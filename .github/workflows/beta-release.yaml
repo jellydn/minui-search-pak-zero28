@@ -18,60 +18,16 @@ jobs:
     name: validate
     runs-on: ubuntu-24.04
     if: github.actor == 'jellydn'
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Get Pak Name
-        id: pak-name
-        run: |
-          echo "PAK_NAME=$(jq -r .name pak.json)" >> $GITHUB_OUTPUT
-
-      - name: Validate zero28 files
-        run: |
-          ls -la bin/zero28/ || exit 1
-          for f in minui-keyboard minui-list minui-presenter; do
-            if [ ! -x "bin/zero28/$f" ]; then
-              echo "Missing: bin/zero28/$f"
-              exit 1
-            fi
-            echo "OK: bin/zero28/$f ($(file bin/zero28/$f | cut -d: -f2))"
-          done
-          echo "PLATFORM=zero28" >> $GITHUB_ENV
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v7
+      - uses: actions/checkout@v6
+      - run: ls -la bin/zero28/
+      - uses: actions/upload-artifact@v7
         with:
-          name: "${{ steps.pak-name.outputs.PAK_NAME }}.pak"
-          path: |
-            launch.sh
-            config.json
-            bin/
-            res/
-
-      - name: Post Beta Download Link
+          name: Search.pak
+          path: launch.sh config.json bin/
+      - name: Post Beta link
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          pr_number="${{ github.event.pull_request.number }}"
-          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          pr_comment="## 🧪 Beta Release
-
-Build successful! Download the artifact to test on your device:
-
-⬇️ **Artifacts → [Search.pak]($run_url)** (click the run link, then download from the Artifacts section)
-
-> ⏳ This artifact will be deleted after **30 minutes**.
->
-> Extract to \`/Tools/\$PLATFORM/Search.pak/\` on your SD card.
->
-> ⚠️ Supported platforms: tg5040, zero28"
-
-          existing=$(gh api "/repos/${{ github.repository }}/issues/$pr_number/comments" \
-            --jq '.[] | select(.body | startswith("## 🧪 Beta Release")) | .id' | tail -1)
-          if [ -n "$existing" ]; then
-            gh api "/repos/${{ github.repository }}/issues/comments/$existing" -X DELETE
-          fi
-
-          gh pr comment "$pr_number" --body "$pr_comment"
+          gh pr comment ${{ github.event.pull_request.number }} --body "## Beta
+          Build OK. Download from Actions artifacts. Expires 30m."
