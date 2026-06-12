@@ -238,9 +238,10 @@ show_game_actions() {
             killall minui-presenter >/dev/null 2>&1 || true
             if [ -n "$emu_path" ] && [ -f "$emu_path" ]; then
                 exec "$emu_path" "$file"
-            else
-                show_message "Emulator not found for $rom_alias" 2
             fi
+            # Emulator not found or launch failed — restore stay_awake
+            echo "1" >/tmp/stay_awake
+            show_message "Could not launch: emulator not found for $rom_alias" 2
             ;;
         "Add to Favorites")
             add_to_favorites "$file"
@@ -382,7 +383,6 @@ main() {
                 emu_name=$(get_emu_name "$emu_folder")
                 emu_path=$(get_emu_path "$emu_name")
                 rom_alias=$(get_rom_alias "$file")
-                rm -f /tmp/stay_awake
 
                 show_game_actions "$file" "$rom_alias" "$emu_path"
             elif [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 3 ]; then

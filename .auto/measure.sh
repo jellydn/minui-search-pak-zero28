@@ -158,6 +158,19 @@ else
   fi
 fi
 
+# Check stay_awake lifecycle: removed only on Launch exec, restored on failure
+echo "=== Check 12: Stay-awake lifecycle ==="
+rm_total=$(grep -c 'rm -f /tmp/stay_awake' launch.sh || true)
+echo_now=$(grep -c 'echo "1" >/tmp/stay_awake' launch.sh || true)
+# 2 rm: one in Launch case + one in cleanup
+# 2 echo: main() startup + restore on emulator failure
+if [ "$rm_total" -eq 2 ] && [ "$echo_now" -eq 2 ]; then
+  echo "OK: stay_awake lifecycle correct ($rm_total rm, $echo_now echo)"
+else
+  echo "FAIL: stay_awake lifecycle wrong ($rm_total rm, $echo_now echo, expected 2 each)"
+  errors=$((errors + 1))
+fi
+
 # Check noise-extension coverage: verify each category is in the grep exclusion
 echo "=== Check 8: Noise extension coverage ==="
 missing=0
