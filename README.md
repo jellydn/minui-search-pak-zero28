@@ -21,27 +21,63 @@ Note: The platform folder name is based on the name of your device. For example,
 
 ## Usage
 
+### First Launch
+
+On first launch you'll pick a **search scope** — either "All Systems" to search
+all ROM folders, or a specific emulator folder (e.g. "SFC", "PS").
+This choice is saved to your SD card and remembered across sessions.
+
+After setting the scope, a main menu appears:
+
+- **Search Games**: Enter a search term via the on-screen keyboard
+- **Browse Favorites**: View and manage your Favorites collection
+- **Exit**: Quit the app
+
 ### Search
 
-Use the keyboard to enter a search term.  
+Use the keyboard to enter a search term.
 Press A to select a character, or B to erase a character.
-Press X to search, or Y to exit
+Press X to search, or Y to exit.
+
+The keyboard title shows the current search scope, e.g. `Search (SFC)`.
+
+Matching results are sorted alphabetically and limited to the chosen scope.
+Non-ROM files (saves, states, configs, images, metadata) are automatically
+filtered out for cleaner results.
 
 ### Search Results
 
-Matching search results will be displayed in a list.
+Results appear as `(emu) Game Name` or `Folder) Game Name`.
+Already-favorited games show a ★ badge.
+
 Select a game and press A to choose an action:
 
-- **Launch**: Launch the selected game
-- **Add to Favorites**: Add the game to your Favorites collection (creates a `Collections/1) Favorites.txt` file on your SD card)
+- **Launch**: Launch the selected game (only shown when emulator is found)
+- **Add to Favorites** / **Remove from Favorites**: Toggle the game in your
+  Favorites collection (`Collections/1) Favorites.txt` on your SD card)
 - **Delete Game**: Permanently delete the ROM file (with confirmation prompt)
 - **Cancel**: Return to the search results
 
 Press B to return to the Search screen.
+Press X at any time to exit.
+
+### Browse Favorites
+
+From the main menu, select "Browse $FAVORITES_LABEL" to view your collection.
+Select a game to see the same actions (Launch, Remove from Favorites,
+Delete Game).
 
 ### Previous Search
 
-When launching search again, the Previous search results will be displayed.
+Your last search term is saved to your SD card and restored when you
+re-launch the app.
+
+## Notes
+
+- The Favorites collection label can be customized in `config.json`
+  via the `settings.favorites_label` field (default: "Favorites").
+- Search scope is saved in `$USERDATA_PATH/$PAK_NAME/search-scope`.
+  Delete this file to re-pick your scope.
 
 ## Acknowledgements
 
