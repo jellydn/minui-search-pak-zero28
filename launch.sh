@@ -77,45 +77,73 @@ format_results() {
         return 0
     fi
 
-    # Build a formatted display line for each search result
-    # Format: "[folder_emu_name|folder_name] game_name"
-    # For favorited games, prepend ★
-    formatted_file="/tmp/formatted-names"
-    : >"$formatted_file"
+    # Single awk pipeline: extract emu folder, format name, check favorites, add badge
+    awk -v sdcard="$SDCARD_PATH" -v fav="$FAVORITES_PATH" '
+    BEGIN {
+        # Load favorites into associative array (normalize to relative paths)
+        if (fav != "") {
+            while ((getline line < fav) > 0) {
+                # Strip leading /<sdcard> prefix if present for matching
+                norm = line
+                if (index(line, sdcard) == 1) {
+                    norm = substr(line, length(sdcard) + 2)
+                }
+                # Also strip leading slash if present
+                if (index(norm, "/") == 1) {
+                    norm = substr(norm, 2)
+                }
+                favs[norm] = 1
+            }
+            close(fav)
+        }
+    }
+    {
+        path = $0
 
-    while IFS= read -r filepath; do
-        filename="$(basename "$filepath")"
-        name="${filename%.*}"
+        # Build relative path for favorites lookup (no leading /)
+        rel = path
+        if (index(path, sdcard) == 1) {
+            rel = substr(path, length(sdcard) + 2)
+        }
+        if (index(rel, "/") == 1) {
+            rel = substr(rel, 2)
+        }
+
+        # Extract game filename (last field)
+        n = split(path, parts, "/")
+        game = parts[n]
+
+        # Strip extension
+        sub(/\.[^.]+$/, "", game)
         # Strip region/tags from game name
-        name="$(printf '%s' "$name" | sed 's/([^)]*)//g; s/\[[^]]*\]//g; s/[[:space:]]*$//g')"
+        gsub(/\([^)]*\)/, "", game)
+        gsub(/\[[^]]*\]/, "", game)
+        gsub(/[[:space:]]*$/, "", game)
 
-        # Extract emu folder
-        rel="${filepath#$SDCARD_PATH/Roms/}"
-        emu_folder="$(printf '%s' "$rel" | cut -d'/' -f1)"
+        # Find the emu folder (field right after "Roms")
+        folder = ""
+        for (i = 1; i <= n; i++) {
+            if (tolower(parts[i]) == "roms") {
+                folder = parts[i+1]
+                break
+            }
+        }
 
-        # Format folder part
-        # Format folder part to match original display style
-        case "$emu_folder" in
-            *"("*)
-                # Folder has parens like 'FC (Japan)': extract just '(Japan' as prefix
-                # Output will be '(Japan) Name' matching original awk format
-                folder_prefix="$(printf '%s' "$emu_folder" | sed 's/.*(/(/; s/)$//')" ;;
-            *)
-                folder_prefix="$emu_folder" ;;
-        esac
+        # Format folder prefix: extract content inside parens
+        if (index(folder, "(") > 0) {
+            sub(/.*\(/, "", folder)
+            sub(/\).*/, "", folder)
+            folder = "(" folder
+        }
 
-        # Check if favorited
-        rel_path="${filepath#$SDCARD_PATH/}"
-        badge=""
-        if [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH" 2>/dev/null; then
-            badge="★ "
-        fi
+        # Build badge
+        badge = ""
+        if (rel in favs) {
+            badge = "\xe2\x98\x85 "
+        }
 
-        echo "${badge}${folder_prefix}) ${name}" >>"$formatted_file"
-    done <"$search_file"
-
-    jq -R -s 'split("\n")[:-1]' <"$formatted_file" >"$results_file"
-    rm -f "$formatted_file"
+        print badge folder ") " game
+    }' "$search_file" | jq -R -s 'split("\n")[:-1]' > "$results_file"
 }
 
 get_rom_alias() {
