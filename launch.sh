@@ -343,6 +343,11 @@ main() {
     previous_search_file="$USERDATA_PATH/$PAK_NAME/search-term"
     minui_ouptut_file="/tmp/minui-output"
 
+    # Initialize files on first launch
+    [ -f "$search_list_file" ] || : >"$search_list_file"
+    [ -f "$results_list_file" ] || : >"$results_list_file"
+    [ -f "$previous_search_file" ] || : >"$previous_search_file"
+
     while true; do
         search_term=$(cat "$previous_search_file")
 
