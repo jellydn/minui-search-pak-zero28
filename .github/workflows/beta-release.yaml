@@ -1,0 +1,38 @@
+---
+name: "beta-release"
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-24.04
+    if: github.actor == 'jellydn'
+    steps:
+      - uses: actions/checkout@v6
+      - run: ls -la bin/zero28/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Search.pak
+          path: |
+            launch.sh
+            config.json
+            pak.json
+            bin
+            pak.json
+      - name: Post Beta link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "## Beta
+          Build OK. Download from Actions artifacts. Expires 30m."

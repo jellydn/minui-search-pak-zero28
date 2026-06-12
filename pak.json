@@ -7,7 +7,8 @@
     "repo_url": "https://github.com/laesetuc/minui-search-pak",
     "release_filename": "Search.pak.zip",
     "platforms": [
-      "tg5040"
+          "tg5040",
+    "zero28"
     ],
     "launch": "launch.sh"
   }
