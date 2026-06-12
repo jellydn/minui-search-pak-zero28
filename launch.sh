@@ -532,7 +532,7 @@ main() {
                 history_list="/tmp/search-history-list"
                 : >"$history_list"
                 echo "New Search..." >>"$history_list"
-                cat "$search_history_file" | head -10 >>"$history_list"
+                head -10 "$search_history_file" >>"$history_list"
 
                 killall minui-presenter >/dev/null 2>&1 || true
                 history_choice=$(minui-list --file "$history_list" --format text --title "Search ($scope)")
