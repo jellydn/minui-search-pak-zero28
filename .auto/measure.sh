@@ -221,6 +221,12 @@ fi
 
 # Check favorites browser
 echo "=== Check 16: Favorites browser ==="
+if grep -q "^format_favorite_line()" launch.sh; then
+  echo "OK: format_favorite_line helper defined"
+else
+  echo "FAIL: format_favorite_line helper missing"
+  errors=$((errors + 1))
+fi
 if grep -q "^browse_favorites()" launch.sh; then
   echo "OK: browse_favorites function defined"
 else

@@ -361,6 +361,21 @@ cleanup() {
     killall minui-presenter >/dev/null 2>&1 || true
 }
 
+# Format a single favorite line for display: "emu_name) pretty_name"
+format_favorite_line() {
+    filepath="$1"
+    filename="$(basename "$filepath")"
+    pretty="${filename%.*}"
+    pretty="$(printf '%s' "$pretty" | sed 's/([^)]*)//g; s/\[[^]]*\]//g; s/[[:space:]]*$//g')"
+    emu_folder=$(get_emu_folder "$filepath")
+    emu_name=$(get_emu_name "$emu_folder")
+    if [ -n "$emu_name" ]; then
+        echo "$emu_name) $pretty"
+    else
+        echo "$emu_folder) $pretty"
+    fi
+}
+
 browse_favorites() {
     if [ ! -s "$FAVORITES_PATH" ]; then
         show_message "$FAVORITES_LABEL is empty." 2
@@ -370,24 +385,12 @@ browse_favorites() {
     fav_list_file="/tmp/browse-favorites-list"
     : >"$fav_list_file"
 
-    # Build display list of favorites with prettified names
+    # Build display list of favorites
     while IFS= read -r fav_path; do
         [ -z "$fav_path" ] && continue
         full_path="$SDCARD_PATH/$fav_path"
-        if [ ! -f "$full_path" ]; then
-            continue
-        fi
-        filename="$(basename "$fav_path")"
-        pretty="${filename%.*}"
-        pretty="$(printf '%s' "$pretty" | sed 's/([^)]*)//g; s/\[[^]]*\]//g; s/[[:space:]]*$//g')"
-        emu_folder=$(get_emu_folder "$full_path")
-        emu_name=$(get_emu_name "$emu_folder")
-        if [ -n "$emu_name" ]; then
-            display="$emu_name) $pretty"
-        else
-            display="$emu_folder) $pretty"
-        fi
-        echo "$display" >>"$fav_list_file"
+        [ -f "$full_path" ] || continue
+        format_favorite_line "$full_path" >>"$fav_list_file"
     done <"$FAVORITES_PATH"
 
     if [ ! -s "$fav_list_file" ]; then
@@ -398,35 +401,22 @@ browse_favorites() {
     killall minui-presenter >/dev/null 2>&1 || true
     selected=$(minui-list --file "$fav_list_file" --format text --title "$FAVORITES_LABEL Collection")
     exit_code=$?
+    rm -f "$fav_list_file"
     if [ "$exit_code" -ne 0 ]; then
-        rm -f "$fav_list_file"
         return 0
     fi
 
-    # Find the matching file path from the display name
+    # Find the matching file path by re-reading favorites
     while IFS= read -r fav_path; do
         [ -z "$fav_path" ] && continue
         full_path="$SDCARD_PATH/$fav_path"
-        if [ ! -f "$full_path" ]; then
-            continue
-        fi
-        filename="$(basename "$fav_path")"
-        pretty="${filename%.*}"
-        pretty="$(printf '%s' "$pretty" | sed 's/([^)]*)//g; s/\[[^]]*\]//g; s/[[:space:]]*$//g')"
-        emu_folder=$(get_emu_folder "$full_path")
-        emu_name=$(get_emu_name "$emu_folder")
-        if [ -n "$emu_name" ]; then
-            disp="$emu_name) $pretty"
-        else
-            disp="$emu_folder) $pretty"
-        fi
+        [ -f "$full_path" ] || continue
+        disp=$(format_favorite_line "$full_path")
         if [ "$disp" = "$selected" ]; then
             selected_file="$full_path"
             break
         fi
     done <"$FAVORITES_PATH"
-
-    rm -f "$fav_list_file"
 
     if [ -z "$selected_file" ] || [ ! -f "$selected_file" ]; then
         return 0
@@ -512,26 +502,26 @@ main() {
         total=$(wc -l < "$search_list_file")
         if [ "$total" -eq 0 ]; then
 
-            # When no search term yet and favorites exist, show a main menu
-            if [ -z "$search_term" ] && [ -s "$FAVORITES_PATH" ]; then
-                main_menu_file="/tmp/main-menu"
-                : >"$main_menu_file"
-                echo "Search Games" >>"$main_menu_file"
+            # Show main menu with optional Browse Favorites
+            main_menu_file="/tmp/main-menu"
+            : >"$main_menu_file"
+            echo "Search Games" >>"$main_menu_file"
+            if [ -s "$FAVORITES_PATH" ]; then
                 echo "Browse $FAVORITES_LABEL" >>"$main_menu_file"
-                echo "Exit" >>"$main_menu_file"
+            fi
+            echo "Exit" >>"$main_menu_file"
 
-                killall minui-presenter >/dev/null 2>&1 || true
-                menu_choice=$(minui-list --file "$main_menu_file" --format text --title "Search")
-                exit_code=$?
-                rm -f "$main_menu_file"
-                if [ "$exit_code" -ne 0 ] || [ "$menu_choice" = "Exit" ]; then
-                    return $exit_code
-                fi
+            killall minui-presenter >/dev/null 2>&1 || true
+            menu_choice=$(minui-list --file "$main_menu_file" --format text --title "Search")
+            exit_code=$?
+            rm -f "$main_menu_file"
+            if [ "$exit_code" -ne 0 ] || [ "$menu_choice" = "Exit" ]; then
+                return $exit_code
+            fi
 
-                if [ "$menu_choice" = "Browse $FAVORITES_LABEL" ]; then
-                    browse_favorites
-                    continue
-                fi
+            if [ "$menu_choice" = "Browse $FAVORITES_LABEL" ]; then
+                browse_favorites
+                continue
             fi
 
             # Get search term
