@@ -155,10 +155,10 @@ fi
 echo "=== Check 12: Stay-awake lifecycle ==="
 rm_total=$(grep -c 'rm -f /tmp/stay_awake' launch.sh || true)
 echo_now=$(grep -c 'echo "1" >/tmp/stay_awake' launch.sh || true)
-if [ "$rm_total" -eq 2 ] && [ "$echo_now" -eq 2 ]; then
+if [ "$rm_total" -eq 2 ] && [ "$echo_now" -eq 1 ]; then
   echo "OK: stay_awake lifecycle correct ($rm_total rm, $echo_now echo)"
 else
-  echo "FAIL: stay_awake lifecycle wrong ($rm_total rm, $echo_now echo, expected 2 each)"
+  echo "FAIL: stay_awake lifecycle wrong ($rm_total rm, $echo_now echo, expected 2 rm, 1 echo)"
   errors=$((errors + 1))
 fi
 

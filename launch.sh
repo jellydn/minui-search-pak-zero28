@@ -261,10 +261,20 @@ show_game_actions() {
     file="$1"
     rom_alias="$2"
     emu_path="$3"
+    emu_name="$4"
+
+    menu_title="$emu_name"
+    if [ -z "$menu_title" ]; then
+        menu_title="$rom_alias"
+    else
+        menu_title="$menu_title) $rom_alias"
+    fi
 
     actions_file="/tmp/game-actions"
     : >"$actions_file"
-    echo "Launch" >>"$actions_file"
+    if [ -n "$emu_path" ] && [ -f "$emu_path" ]; then
+        echo "Launch" >>"$actions_file"
+    fi
     if is_favorited "$file"; then
         echo "Remove from Favorites" >>"$actions_file"
     else
@@ -274,7 +284,7 @@ show_game_actions() {
     echo "Cancel" >>"$actions_file"
 
     killall minui-presenter >/dev/null 2>&1 || true
-    action=$(minui-list --file "$actions_file" --format text --title "$rom_alias")
+    action=$(minui-list --file "$actions_file" --format text --title "$menu_title")
     exit_code=$?
     if [ "$exit_code" -ne 0 ]; then
         return 0
@@ -285,12 +295,7 @@ show_game_actions() {
             rm -f /tmp/stay_awake
             add_game_to_recents "$file" "$rom_alias"
             killall minui-presenter >/dev/null 2>&1 || true
-            if [ -n "$emu_path" ] && [ -f "$emu_path" ]; then
-                exec "$emu_path" "$file"
-            fi
-            # Emulator not found or launch failed — restore stay_awake
-            echo "1" >/tmp/stay_awake
-            show_message "Could not launch: emulator not found for $rom_alias" 2
+            exec "$emu_path" "$file"
             ;;
         "Add to Favorites")
             add_to_favorites "$file"
@@ -401,12 +406,11 @@ main() {
                 selected_index="$(echo "$output" | jq -r '.selected')"
                 file=$(sed -n "$((selected_index + 1))p" "$search_list_file")
 
-                emu_folder=$(get_emu_folder "$file")
-                emu_name=$(get_emu_name "$emu_folder")
+                emu_name=$(get_emu_name "$(get_emu_folder "$file")")
                 emu_path=$(get_emu_path "$emu_name")
                 rom_alias=$(get_rom_alias "$file")
 
-                show_game_actions "$file" "$rom_alias" "$emu_path"
+                show_game_actions "$file" "$rom_alias" "$emu_path" "$emu_name"
             elif [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 3 ]; then
                 return $exit_code
             else
