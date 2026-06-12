@@ -53,7 +53,7 @@ add_game_to_recents() {
     mv "/tmp/recent.txt" "$RECENTS_PATH"
 }
 
-# Filter out non-ROM file extensions (saves, states, configs, media, metadata, playlists)
+# Filter out non-ROM file extensions (saves, states, configs, media, metadata)
 # Only passes through actual game/ROM files
 filter_game_files() {
     grep -Eiv '\.(txt|log|sav|srm|state|fsstate|rtc|nv|cfg|conf|png|jpe?g|bmp|gif|tif|webp|xml|dat|lst|pdf)$'
@@ -203,8 +203,13 @@ delete_game() {
     pretty_name=$(basename "$file" | sed -e 's/([^()]*)//g' -e 's/\[[^]]*\]//g')
     show_message "$pretty_name deleted." 3
 
-    # Clear search results so we go back to search
-    : >"$search_list_file"
+    # Remove the deleted file from the search list so remaining results show
+    # Use grep -F to treat the path as a literal string (not a regex pattern)
+    if [ -f "$search_list_file" ]; then
+        grep -Fxv "$file" "$search_list_file" > "${search_list_file}.tmp" 2>/dev/null
+        mv "${search_list_file}.tmp" "$search_list_file"
+    fi
+    # Clear formatted results so they are regenerated on next display
     : >"$results_list_file"
 }
 
@@ -305,9 +310,7 @@ main() {
             minui-keyboard --title "Search" --initial-value "$search_term" --show-hardware-group --write-location "$minui_ouptut_file" --disable-auto-sleep 
             exit_code=$?
             if [ "$exit_code" -eq 2 ] || [ "$exit_code" -eq 3 ]; then
-                #>"$previous_search_file"
                 return $exit_code
-                #echo hi
             elif [ "$exit_code" -ne 0 ]; then
                 show_message "Error entering search term" 2
                 return 1
@@ -387,11 +390,9 @@ main() {
                 show_game_actions "$file" "$rom_alias" "$emu_path"
             elif [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 3 ]; then
                 return $exit_code
-                #echo hi
             else
                 : >"$results_list_file"
                 : >"$search_list_file"
-                #return $exit_code
             fi
         fi
     done
