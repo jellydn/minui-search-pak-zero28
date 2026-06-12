@@ -25,7 +25,7 @@ fi
 
 # Check that required functions exist
 echo "=== Check 2: Required functions ==="
-required_funcs="load_settings show_confirm add_to_favorites delete_game show_game_actions filter_game_files add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
+required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
 for func in $required_funcs; do
   if grep -q "^${func}()" launch.sh; then
     echo "OK: $func found"
@@ -82,12 +82,24 @@ for var in COLLECTIONS_PATH RECENTS_PATH FAVORITES_LABEL FAVORITES_PATH; do
   fi
 done
 
-# Check that the action flow calls show_game_actions instead of direct exec
+# Check that the action menu dynamically shows Add/Remove depending on favorites state
 echo "=== Check 6: Action flow integration ==="
+if grep -q "is_favorited" launch.sh; then
+  echo "OK: is_favorited helper used for dynamic menu"
+else
+  echo "FAIL: is_favorited not used"
+  errors=$((errors + 1))
+fi
 if grep -q "show_game_actions" launch.sh; then
   echo "OK: show_game_actions called from main loop"
 else
   echo "FAIL: show_game_actions not called from main loop"
+  errors=$((errors + 1))
+fi
+if grep -q "Remove from Favorites" launch.sh; then
+  echo "OK: Remove from Favorites action available in menu"
+else
+  echo "FAIL: Remove from Favorites action missing"
   errors=$((errors + 1))
 fi
 
