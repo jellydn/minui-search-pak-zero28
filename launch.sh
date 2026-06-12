@@ -464,6 +464,7 @@ main() {
     results_list_file="/tmp/results-list"
     previous_search_file="$USERDATA_PATH/$PAK_NAME/search-term"
     search_scope_file="$USERDATA_PATH/$PAK_NAME/search-scope"
+    search_history_file="$USERDATA_PATH/$PAK_NAME/search-history"
     minui_ouptut_file="/tmp/minui-output"
 
     # Initialize files on first launch
@@ -471,6 +472,7 @@ main() {
     [ -f "$results_list_file" ] || : >"$results_list_file"
     [ -f "$previous_search_file" ] || : >"$previous_search_file"
     [ -f "$search_scope_file" ] || : >"$search_scope_file"
+    [ -f "$search_history_file" ] || : >"$search_history_file"
 
     # On first launch, let user pick search scope (emu folder or All Systems)
     scope=$(cat "$search_scope_file")
@@ -534,6 +536,45 @@ main() {
             fi
             first_launch=false
 
+            # Show search history when no current search
+            if [ -z "$search_term" ] && [ -s "$search_history_file" ]; then
+                history_list="/tmp/search-history-list"
+                : >"$history_list"
+                echo "New Search..." >>"$history_list"
+                cat "$search_history_file" | head -10 >>"$history_list"
+
+                killall minui-presenter >/dev/null 2>&1 || true
+                history_choice=$(minui-list --file "$history_list" --format text --title "Search ($scope)")
+                exit_code=$?
+                rm -f "$history_list"
+                if [ "$exit_code" -ne 0 ]; then
+                    return $exit_code
+                fi
+
+                if [ "$history_choice" != "New Search..." ]; then
+                    search_term="$history_choice"
+                    echo "$search_term" >"$previous_search_file"
+                    show_message "Searching..."
+
+                    search_pattern=$(escape_glob "$search_term")
+                    find "$search_root" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
+                    total=$(wc -l < "$search_list_file")
+
+                    if [ "$total" -eq 0 ]; then
+                        show_message "Could not find any games." 2
+                    else
+                        format_results "$results_list_file" "$search_list_file"
+                    fi
+                    # Save even from history replay
+                    grep -Fx "$search_term" "$search_history_file" >/dev/null 2>&1 || {
+                        printf '%s\n' "$search_term" >>"$search_history_file"
+                        tail -10 "$search_history_file" >"${search_history_file}.tmp"
+                        mv "${search_history_file}.tmp" "$search_history_file"
+                    }
+                    continue
+                fi
+            fi
+
             # Get search term
             killall minui-presenter >/dev/null 2>&1 || true
             minui-keyboard --title "Search ($scope)" --initial-value "$search_term" --show-hardware-group --write-location "$minui_ouptut_file" --disable-auto-sleep 
@@ -565,6 +606,12 @@ main() {
                     show_message "Could not find any games." 2
                 else
                     format_results "$results_list_file" "$search_list_file"
+                    # Save to search history (deduped, max 10)
+                    grep -Fx "$search_term" "$search_history_file" >/dev/null 2>&1 || {
+                        printf '%s\n' "$search_term" >>"$search_history_file"
+                        tail -10 "$search_history_file" >"${search_history_file}.tmp"
+                        mv "${search_history_file}.tmp" "$search_history_file"
+                    }
                 fi
             fi
         fi
