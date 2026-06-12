@@ -382,41 +382,46 @@ browse_favorites() {
         return 0
     fi
 
-    fav_list_file="/tmp/browse-favorites-list"
-    : >"$fav_list_file"
+    # Build paired file: tab-separated path + display name
+    paired_file="/tmp/browse-favorites-paired"
+    : >"$paired_file"
 
-    # Build display list of favorites
     while IFS= read -r fav_path; do
         [ -z "$fav_path" ] && continue
         full_path="$SDCARD_PATH/$fav_path"
         [ -f "$full_path" ] || continue
-        format_favorite_line "$full_path" >>"$fav_list_file"
+        display=$(format_favorite_line "$full_path")
+        printf '%s|%s\n' "$full_path" "$display" >>"$paired_file"
     done <"$FAVORITES_PATH"
 
-    if [ ! -s "$fav_list_file" ]; then
+    if [ ! -s "$paired_file" ]; then
         show_message "No valid files in $FAVORITES_LABEL." 2
         return 0
     fi
 
+    # Extract just the display column for the list
+    display_file="/tmp/browse-favorites-display"
+    cut -d'|' -f2- "$paired_file" >"$display_file"
+
     killall minui-presenter >/dev/null 2>&1 || true
-    selected=$(minui-list --file "$fav_list_file" --format text --title "$FAVORITES_LABEL Collection")
+    selected=$(minui-list --file "$display_file" --format text --title "$FAVORITES_LABEL Collection")
     exit_code=$?
-    rm -f "$fav_list_file"
+    rm -f "$display_file"
     if [ "$exit_code" -ne 0 ]; then
+        rm -f "$paired_file"
         return 0
     fi
 
-    # Find the matching file path by re-reading favorites
-    while IFS= read -r fav_path; do
-        [ -z "$fav_path" ] && continue
-        full_path="$SDCARD_PATH/$fav_path"
-        [ -f "$full_path" ] || continue
-        disp=$(format_favorite_line "$full_path")
-        if [ "$disp" = "$selected" ]; then
-            selected_file="$full_path"
+    # Find the matching line by display name (display is 2nd field)
+    selected_file=""
+    while IFS='|' read -r filepath display; do
+        if [ "$display" = "$selected" ]; then
+            selected_file="$filepath"
             break
         fi
-    done <"$FAVORITES_PATH"
+    done <"$paired_file"
+
+    rm -f "$paired_file"
 
     if [ -z "$selected_file" ] || [ ! -f "$selected_file" ]; then
         return 0
