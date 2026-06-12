@@ -92,18 +92,29 @@ else
 fi
 
 # Check search pipeline uses filter_game_files
-echo "=== Check 7: Search pipeline uses filter_game_files ==="
+echo "=== Check 7: Search pipeline uses filter_game_files + sort ==="
 if grep -q "filter_game_files" launch.sh; then
   echo "OK: search pipeline pipes through filter_game_files"
 else
   echo "FAIL: filter_game_files not used in search pipeline"
   errors=$((errors + 1))
 fi
-if grep -q "find.*Roms.*| filter_game_files" launch.sh; then
-  echo "OK: find piped directly to filter_game_files"
+if grep -q "find.*Roms.*| filter_game_files | sort" launch.sh; then
+  echo "OK: find piped through filter_game_files then sorted"
 else
-  echo "FAIL: filter_game_files not piped from find in search pipeline"
+  echo "FAIL: find pipeline missing sort after filter_game_files"
   errors=$((errors + 1))
+fi
+
+# Check wc -l < is used instead of cat | wc -l
+echo "=== Check 9: Efficient wc -l usage ==="
+wc_anti=$(grep -c 'cat.*|.*wc -l' launch.sh || true)
+wc_good=$(grep -c 'wc -l <' launch.sh || true)
+if [ "$wc_anti" -eq 0 ] && [ "$wc_good" -ge 3 ]; then
+  echo "OK: no cat | wc -l anti-patterns, $wc_good wc -l < usages"
+else
+  echo "FAIL: $wc_anti cat | wc -l anti-patterns remain"
+  errors=$((errors + wc_anti))
 fi
 
 # Check noise-extension coverage: verify each category is in the grep exclusion

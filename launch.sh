@@ -259,7 +259,7 @@ main() {
     while true; do
         search_term=$(cat "$previous_search_file")
 
-        total=$(cat "$search_list_file" | wc -l)
+        total=$(wc -l < "$search_list_file")
         if [ "$total" -eq 0 ]; then
 
             # Get search term
@@ -280,8 +280,8 @@ main() {
             # Perform search
             show_message "Searching..."
 
-            find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files > "$search_list_file"
-            total=$(cat "$search_list_file" | wc -l)
+            find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files | sort -f > "$search_list_file"
+            total=$(wc -l < "$search_list_file")
 
             if [ "$total" -eq 0 ]; then
                 show_message "Could not find any games." 2
@@ -297,7 +297,7 @@ main() {
 
         # Display Results
 
-        total=$(cat "$search_list_file" | wc -l)
+        total=$(wc -l < "$search_list_file")
         if [ "$total" -gt 0 ]; then
             killall minui-presenter >/dev/null 2>&1 || true
             minui-list --file "$results_list_file" --format json --write-location "$minui_ouptut_file" --write-value state --disable-auto-sleep --action-button "X" --action-text "EXIT"  --title "Search: $search_term ($total results)"
