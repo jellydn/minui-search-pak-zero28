@@ -496,33 +496,38 @@ main() {
         search_root="$SDCARD_PATH/Roms/$scope"
     fi
 
+    first_launch=true
+
     while true; do
         search_term=$(cat "$previous_search_file")
 
         total=$(wc -l < "$search_list_file")
         if [ "$total" -eq 0 ]; then
 
-            # Show main menu with optional Browse Favorites
-            main_menu_file="/tmp/main-menu"
-            : >"$main_menu_file"
-            echo "Search Games" >>"$main_menu_file"
-            if [ -s "$FAVORITES_PATH" ]; then
-                echo "Browse $FAVORITES_LABEL" >>"$main_menu_file"
-            fi
-            echo "Exit" >>"$main_menu_file"
+            # Show main menu only on app start
+            if [ "$first_launch" = true ]; then
+                main_menu_file="/tmp/main-menu"
+                : >"$main_menu_file"
+                echo "Search Games" >>"$main_menu_file"
+                if [ -s "$FAVORITES_PATH" ]; then
+                    echo "Browse $FAVORITES_LABEL" >>"$main_menu_file"
+                fi
+                echo "Exit" >>"$main_menu_file"
 
-            killall minui-presenter >/dev/null 2>&1 || true
-            menu_choice=$(minui-list --file "$main_menu_file" --format text --title "Search")
-            exit_code=$?
-            rm -f "$main_menu_file"
-            if [ "$exit_code" -ne 0 ] || [ "$menu_choice" = "Exit" ]; then
-                return $exit_code
-            fi
+                killall minui-presenter >/dev/null 2>&1 || true
+                menu_choice=$(minui-list --file "$main_menu_file" --format text --title "Search")
+                exit_code=$?
+                rm -f "$main_menu_file"
+                if [ "$exit_code" -ne 0 ] || [ "$menu_choice" = "Exit" ]; then
+                    return $exit_code
+                fi
 
-            if [ "$menu_choice" = "Browse $FAVORITES_LABEL" ]; then
-                browse_favorites
-                continue
+                if [ "$menu_choice" = "Browse $FAVORITES_LABEL" ]; then
+                    browse_favorites
+                    continue
+                fi
             fi
+            first_launch=false
 
             # Get search term
             killall minui-presenter >/dev/null 2>&1 || true
