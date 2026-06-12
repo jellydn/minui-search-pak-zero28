@@ -306,23 +306,31 @@ main() {
                 return 1
             fi
             search_term=$(cat "$minui_ouptut_file")
+            # Trim whitespace
+            search_term=$(printf '%s' "$search_term" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             echo "$search_term" > "$previous_search_file"
 
             # Perform search
-            show_message "Searching..."
-
-            find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files | sort -f > "$search_list_file"
-            total=$(wc -l < "$search_list_file")
-
-            if [ "$total" -eq 0 ]; then
-                show_message "Could not find any games." 2
-            else
+            if [ -z "$search_term" ]; then
+                show_message "Please enter a search term." 2
+                : >"$search_list_file"
                 : >"$results_list_file"
-                sed "$search_list_file" \
-                    -e 's/^[^(]*(/(/' \
-                    -e 's/)[^/]*\//) /' \
-                    -e 's/[[:space:]]*$//' \
-                    | jq -R -s 'split("\n")[:-1]' > "$results_list_file"
+            else
+                show_message "Searching..."
+
+                find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files | sort -f > "$search_list_file"
+                total=$(wc -l < "$search_list_file")
+
+                if [ "$total" -eq 0 ]; then
+                    show_message "Could not find any games." 2
+                else
+                    : >"$results_list_file"
+                    sed "$search_list_file" \
+                        -e 's/^[^(]*(/(/' \
+                        -e 's/)[^/]*\//) /' \
+                        -e 's/[[:space:]]*$//' \
+                        | jq -R -s 'split("\n")[:-1]' > "$results_list_file"
+                fi
             fi
         fi
 
