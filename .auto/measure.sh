@@ -219,6 +219,21 @@ else
   errors=$((errors + 1))
 fi
 
+# Check favorites browser
+echo "=== Check 16: Favorites browser ==="
+if grep -q "^browse_favorites()" launch.sh; then
+  echo "OK: browse_favorites function defined"
+else
+  echo "FAIL: browse_favorites function missing"
+  errors=$((errors + 1))
+fi
+if grep -q "Browse.*FAVORITES_LABEL" launch.sh; then
+  echo "OK: Browse Favorites option in main menu"
+else
+  echo "FAIL: Browse Favorites option missing"
+  errors=$((errors + 1))
+fi
+
 # Check noise-extension coverage
 echo "=== Check 8: Noise extension coverage ==="
 missing=0
