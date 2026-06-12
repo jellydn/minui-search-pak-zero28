@@ -135,13 +135,15 @@ show_confirm() {
 
 is_favorited() {
     file="$1"
-    rel_path="${file#"$SDCARD_PATH/"}"
+    # Normalize to leading slash (ecosystem convention: /Roms/...)
+    rel_path="${file#"$SDCARD_PATH"}"
     [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH"
 }
 
 add_to_favorites() {
     file="$1"
-    rel_path="${file#"$SDCARD_PATH/"}"
+    # Normalize to leading slash (ecosystem convention: /Roms/...)
+    rel_path="${file#"$SDCARD_PATH"}"
 
     mkdir -p "$COLLECTIONS_PATH"
     touch "$FAVORITES_PATH"
@@ -158,7 +160,8 @@ add_to_favorites() {
 
 remove_from_favorites() {
     file="$1"
-    rel_path="${file#"$SDCARD_PATH/"}"
+    # Normalize to leading slash (ecosystem convention: /Roms/...)
+    rel_path="${file#"$SDCARD_PATH"}"
 
     if [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH"; then
         grep -Fxv "$rel_path" "$FAVORITES_PATH" > "${FAVORITES_PATH}.tmp" 2>/dev/null
@@ -174,7 +177,8 @@ remove_from_favorites() {
 
 delete_game() {
     file="$1"
-    rel_path="${file#"$SDCARD_PATH/"}"
+    # Normalize to leading slash (ecosystem convention: /Roms/...)
+    rel_path="${file#"$SDCARD_PATH"}"
 
     if ! show_confirm "Delete $(basename "$file")?"; then
         return 0
