@@ -13,27 +13,44 @@ cd "$PAK_DIR" || exit 1
 mkdir -p "$USERDATA_PATH/$PAK_NAME"
 
 ARCHITECTURE=arm
-if [[ "$(uname -m)" == *"64"* ]]; then
-    ARCHITECTURE=arm64
-fi
+case "$(uname -m)" in
+    *64*) ARCHITECTURE=arm64 ;;
+esac
 
 export HOME="$USERDATA_PATH/$PAK_NAME"
 export LD_LIBRARY_PATH="$PAK_DIR/lib:$LD_LIBRARY_PATH"
 export PATH="$PAK_DIR/bin/$ARCHITECTURE:$PAK_DIR/bin/$PLATFORM:$PAK_DIR/bin:$PATH"
 
+COLLECTIONS_PATH="$SDCARD_PATH/Collections"
+FAVORITES_LABEL="Favorites"
+FAVORITES_PATH="$COLLECTIONS_PATH/1) $FAVORITES_LABEL.txt"
+RECENTS_PATH="$SDCARD_PATH/.userdata/shared/.minui/recent.txt"
+
+load_settings() {
+    config_file="$PAK_DIR/config.json"
+
+    if [ ! -f "$config_file" ]; then
+        return 1
+    fi
+
+    if jq -e '.settings.favorites_label' "$config_file" >/dev/null 2>&1; then
+        FAVORITES_LABEL=$(jq -r '.settings.favorites_label' "$config_file")
+        FAVORITES_PATH="$COLLECTIONS_PATH/1) $FAVORITES_LABEL.txt"
+    fi
+}
+
 add_game_to_recents() {
     filepath="$1" game_alias="$2"
 
     filepath="${filepath#"$SDCARD_PATH/"}"
-    recents="$SDCARD_PATH/.userdata/shared/.minui/recent.txt"
-    if [ -f "$recents" ]; then
-        sed -i "\#/$filepath$(printf '\t')$game_alias#d" "$recents"
+    if [ -f "$RECENTS_PATH" ]; then
+        sed -i "\#/$filepath$(printf '\t')$game_alias#d" "$RECENTS_PATH"
     fi
 
     rm -f "/tmp/recent.txt"
     printf "%s\t%s\n" "/$filepath" "$game_alias" >"/tmp/recent.txt"
-    cat "$recents" >>"/tmp/recent.txt"
-    mv "/tmp/recent.txt" "$recents"
+    cat "$RECENTS_PATH" >>"/tmp/recent.txt"
+    mv "/tmp/recent.txt" "$RECENTS_PATH"
 }
 
 get_rom_alias() {
@@ -91,6 +108,112 @@ show_message() {
     fi
 }
 
+show_confirm() {
+    message="$1"
+
+    killall minui-presenter >/dev/null 2>&1 || true
+    echo "$message" 1>&2
+
+    if ! minui-presenter --message "$message" \
+        --confirm-show \
+        --cancel-show \
+        --confirm-text "YES" \
+        --cancel-text "NO" \
+        --timeout 0; then
+        return 1
+    fi
+
+    return 0
+}
+
+add_to_favorites() {
+    file="$1"
+
+    rel_path="${file#"$SDCARD_PATH/"}"
+
+    mkdir -p "$COLLECTIONS_PATH"
+    touch "$FAVORITES_PATH"
+
+    if ! grep -Fxq "$rel_path" "$FAVORITES_PATH"; then
+        echo "$rel_path" >> "$FAVORITES_PATH"
+        awk -F'/' '{print $NF "|" $0}' "$FAVORITES_PATH" | sort -t'|' -k1,1 | cut -d'|' -f2- > "${FAVORITES_PATH}.tmp"
+        mv "${FAVORITES_PATH}.tmp" "$FAVORITES_PATH"
+
+        pretty_name=$(basename "$file" | sed -e 's/([^()]*)//g' -e 's/\[[^]]*\]//g')
+        show_message "$pretty_name added to $FAVORITES_LABEL." 3
+    fi
+}
+
+delete_game() {
+    file="$1"
+
+    rel_path="${file#"$SDCARD_PATH/"}"
+
+    if ! show_confirm "Delete $(basename "$file")?"; then
+        return 0
+    fi
+
+    rm -f "$file"
+
+    # Remove from favorites if present
+    if [ -f "$FAVORITES_PATH" ]; then
+        grep -Fxv "$rel_path" "$FAVORITES_PATH" > "${FAVORITES_PATH}.tmp" 2>/dev/null
+        mv "${FAVORITES_PATH}.tmp" "$FAVORITES_PATH"
+        if [ ! -s "$FAVORITES_PATH" ]; then
+            rm -f "$FAVORITES_PATH"
+        fi
+    fi
+
+    pretty_name=$(basename "$file" | sed -e 's/([^()]*)//g' -e 's/\[[^]]*\]//g')
+    show_message "$pretty_name deleted." 3
+
+    # Clear search results so we go back to search
+    : >"$search_list_file"
+    : >"$results_list_file"
+}
+
+show_game_actions() {
+    file="$1"
+    rom_alias="$2"
+    emu_path="$3"
+
+    actions_file="/tmp/game-actions"
+    : >"$actions_file"
+    echo "Launch" >>"$actions_file"
+    echo "Add to Favorites" >>"$actions_file"
+    echo "Delete Game" >>"$actions_file"
+    echo "Cancel" >>"$actions_file"
+
+    killall minui-presenter >/dev/null 2>&1 || true
+    action=$(minui-list --file "$actions_file" --format text --title "$rom_alias")
+    exit_code=$?
+    if [ "$exit_code" -ne 0 ]; then
+        return 0
+    fi
+
+    case "$action" in
+        "Launch")
+            rm -f /tmp/stay_awake
+            add_game_to_recents "$file" "$rom_alias"
+            killall minui-presenter >/dev/null 2>&1 || true
+            if [ -n "$emu_path" ] && [ -f "$emu_path" ]; then
+                exec "$emu_path" "$file"
+            else
+                show_message "Emulator not found for $rom_alias" 2
+            fi
+            ;;
+        "Add to Favorites")
+            add_to_favorites "$file"
+            ;;
+        "Delete Game")
+            delete_game "$file"
+            ;;
+        *)
+            # Cancel - do nothing
+            ;;
+    esac
+}
+
 cleanup() {
     rm -f /tmp/stay_awake
     killall minui-presenter >/dev/null 2>&1 || true
@@ -110,6 +233,15 @@ main() {
     fi
     if ! command -v minui-list >/dev/null 2>&1; then
         show_message "minui-list not found" 2
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        show_message "jq not found" 2
+        return 1
+    fi
+
+    if ! load_settings; then
+        show_message "Could not load settings" 2
         return 1
     fi
 
@@ -148,7 +280,7 @@ main() {
             if [ "$total" -eq 0 ]; then
                 show_message "Could not find any games." 2
             else
-                >"$results_list_file"
+                : >"$results_list_file"
                 sed "$search_list_file" \
                     -e 's/^[^(]*(/(/' \
                     -e 's/)[^/]*\//) /' \
@@ -175,15 +307,13 @@ main() {
                 rom_alias=$(get_rom_alias "$file")
                 rm -f /tmp/stay_awake
 
-                add_game_to_recents "$file" "$rom_alias"
-                killall minui-presenter >/dev/null 2>&1 || true
-                exec "$emu_path" "$file"
+                show_game_actions "$file" "$rom_alias" "$emu_path"
             elif [ "$exit_code" -eq 4 ] || [ "$exit_code" -eq 3 ]; then
                 return $exit_code
                 #echo hi
             else
-                >"$results_list_file"
-                >"$search_list_file"
+                : >"$results_list_file"
+                : >"$search_list_file"
                 #return $exit_code
             fi
         fi

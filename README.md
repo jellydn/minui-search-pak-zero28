@@ -6,6 +6,7 @@ An app for searching your ROM collection.
 This pak is designed for and tested with the following MinUI Platforms and devices:
 
 - `tg5040`: Trimui Brick (formerly `tg3040`)
+- `zero28`: MagicX Mini Zero 28
 
 ## Installation
 
@@ -29,7 +30,14 @@ Press X to search, or Y to exit
 ### Search Results
 
 Matching search results will be displayed in a list.
-Select a game and press A to launch the game, or B to return to the Search screen.
+Select a game and press A to choose an action:
+
+- **Launch**: Launch the selected game
+- **Add to Favorites**: Add the game to your Favorites collection (creates a `Collections/1) Favorites.txt` file on your SD card)
+- **Delete Game**: Permanently delete the ROM file (with confirmation prompt)
+- **Cancel**: Return to the search results
+
+Press B to return to the Search screen.
 
 ### Previous Search
 
