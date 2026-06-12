@@ -144,7 +144,7 @@ execute_search() {
     fi
 
     search_pattern=$(escape_glob "$search_term")
-    find "$search_root_dir" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
+    find "$search_root_dir" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | LC_ALL=C sort -f > "$search_list_file"
     total=$(wc -l < "$search_list_file")
 
     if [ "$total" -eq 0 ]; then
@@ -294,11 +294,12 @@ delete_game() {
     pretty_name=$(basename "$file" | sed -e 's/([^()]*)//g' -e 's/\[[^]]*\]//g')
     show_message "$pretty_name deleted." 3
 
-    if [ -f "$search_list_file" ]; then
+    # Remove from search results if we have an active search
+    if [ -n "$search_list_file" ] && [ -f "$search_list_file" ]; then
         grep -Fxv "$file" "$search_list_file" > "${search_list_file}.tmp" 2>/dev/null
         mv "${search_list_file}.tmp" "$search_list_file"
+        format_results "$results_list_file" "$search_list_file"
     fi
-    format_results "$results_list_file" "$search_list_file"
 }
 
 show_game_actions() {

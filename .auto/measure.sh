@@ -109,7 +109,7 @@ else
   echo "FAIL: filter_game_files not used in search pipeline"
   errors=$((errors + 1))
 fi
-if grep -q "| filter_game_files | sort" launch.sh; then
+if grep -q "filter_game_files.*sort -f" launch.sh; then
   echo "OK: find piped through filter_game_files then sorted"
 else
   echo "FAIL: find pipeline missing sort after filter_game_files"
