@@ -291,7 +291,7 @@ main() {
 
     search_list_file="/tmp/search-list"
     results_list_file="/tmp/results-list"
-    previous_search_file="/tmp/search-term"
+    previous_search_file="$USERDATA_PATH/$PAK_NAME/search-term"
     minui_ouptut_file="/tmp/minui-output"
 
     while true; do

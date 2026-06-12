@@ -129,9 +129,9 @@ else
   errors=$((errors + wc_anti))
 fi
 
-# Check glob metacharacters are escaped in search pipeline
+# Check glob metacharacters are escaped
 echo "=== Check 10: Glob metacharacter escaping ==="
-if grep -q "escape_glob" launch.sh; then
+if grep -q "^escape_glob()" launch.sh; then
   echo "OK: escape_glob function defined"
 else
   echo "FAIL: escape_glob function missing"
@@ -144,26 +144,19 @@ else
   errors=$((errors + 1))
 fi
 
-# Check display formatting uses awk (not the old fragile sed)
+# Check display formatting uses awk
 echo "=== Check 11: Display formatting for folder types ==="
-if grep -q "awk.*search_list_file.*results_list_file" launch.sh; then
+if grep -q "awk -F/" launch.sh; then
   echo "OK: awk-based display formatting for folder+game name"
 else
-  # awk may not appear on same line as both files — check it's used in formatting
-  if grep -q "awk -F/" launch.sh; then
-    echo "OK: awk-based display formatting for folder+game name"
-  else
-    echo "FAIL: awk-based display formatting not found"
-    errors=$((errors + 1))
-  fi
+  echo "FAIL: awk-based display formatting not found"
+  errors=$((errors + 1))
 fi
 
-# Check stay_awake lifecycle: removed only on Launch exec, restored on failure
+# Check stay_awake lifecycle
 echo "=== Check 12: Stay-awake lifecycle ==="
 rm_total=$(grep -c 'rm -f /tmp/stay_awake' launch.sh || true)
 echo_now=$(grep -c 'echo "1" >/tmp/stay_awake' launch.sh || true)
-# 2 rm: one in Launch case + one in cleanup
-# 2 echo: main() startup + restore on emulator failure
 if [ "$rm_total" -eq 2 ] && [ "$echo_now" -eq 2 ]; then
   echo "OK: stay_awake lifecycle correct ($rm_total rm, $echo_now echo)"
 else
@@ -171,7 +164,22 @@ else
   errors=$((errors + 1))
 fi
 
-# Check noise-extension coverage: verify each category is in the grep exclusion
+# Check search term persists across sessions
+echo "=== Check 13: Search term persistence ==="
+if grep -q 'search-term' launch.sh; then
+  echo "OK: search term path includes 'search-term'"
+else
+  echo "FAIL: no search-term path found"
+  errors=$((errors + 1))
+fi
+if grep -q 'previous_search_file.*USERDATA_PATH' launch.sh || grep -q 'previous_search_file.*PAK_NAME' launch.sh; then
+  echo "OK: search term persists in userdata across sessions"
+else
+  echo "FAIL: search term uses /tmp, lost across sessions"
+  errors=$((errors + 1))
+fi
+
+# Check noise-extension coverage
 echo "=== Check 8: Noise extension coverage ==="
 missing=0
 filter_line=$(grep -A1 'filter_game_files()' launch.sh | tail -1)
@@ -180,28 +188,28 @@ echo "Filter line: $filter_line"
 if echo "$filter_line" | grep -q 'sav\|state\|srm\|rtc\|nv'; then
   echo "OK: save/state extensions covered"
 else
-  echo "MISSING: save/state extensions (sav, srm, state, rtc)"
+  echo "MISSING: save/state extensions"
   missing=$((missing + 1))
 fi
 
 if echo "$filter_line" | grep -q 'cfg\|conf'; then
   echo "OK: config extensions covered"
 else
-  echo "MISSING: config extensions (cfg, conf)"
+  echo "MISSING: config extensions"
   missing=$((missing + 1))
 fi
 
 if echo "$filter_line" | grep -q 'png\|jpe\?g\|bmp\|gif\|tif\|webp'; then
   echo "OK: media/image extensions covered"
 else
-  echo "MISSING: media/image extensions (png, jpg, bmp, gif)"
+  echo "MISSING: media/image extensions"
   missing=$((missing + 1))
 fi
 
 if echo "$filter_line" | grep -q 'xml\|dat\|txt\|log\|lst\|pdf'; then
   echo "OK: metadata/text extensions covered"
 else
-  echo "MISSING: metadata/text extensions (xml, dat, txt, log)"
+  echo "MISSING: metadata/text extensions"
   missing=$((missing + 1))
 fi
 
