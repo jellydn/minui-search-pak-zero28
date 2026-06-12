@@ -77,37 +77,45 @@ format_results() {
         return 0
     fi
 
-    : >"$results_file"
-    awk -F/ '
-    {
-        # Extract game filename (last field)
-        game = $NF
-        # Strip extension
-        sub(/\.[^.]+$/, "", game)
+    # Build a formatted display line for each search result
+    # Format: "[folder_emu_name|folder_name] game_name"
+    # For favorited games, prepend ★
+    formatted_file="/tmp/formatted-names"
+    : >"$formatted_file"
+
+    while IFS= read -r filepath; do
+        filename="$(basename "$filepath")"
+        name="${filename%.*}"
         # Strip region/tags from game name
-        gsub(/\([^)]*\)/, "", game)
-        gsub(/\[[^]]*\]/, "", game)
-        sub(/[[:space:]]*$/, "", game)
+        name="$(printf '%s' "$name" | sed 's/([^)]*)//g; s/\[[^]]*\]//g; s/[[:space:]]*$//g')"
 
-        # Find the emu folder (field after Roms)
-        for (i = 1; i <= NF; i++) {
-            if (tolower($i) == "roms") {
-                folder = $(i+1)
-                break
-            }
-        }
+        # Extract emu folder
+        rel="${filepath#$SDCARD_PATH/Roms/}"
+        emu_folder="$(printf '%s' "$rel" | cut -d'/' -f1)"
 
-        if (folder ~ /\(/) {
-            # Folder has parens: "(emu) game"
-            sub(/.*\(/, "(", folder)
-            sub(/\).*/, ")", folder)
-            print folder " " game
-        } else {
-            # No parens: "folder) game"
-            print folder ") " game
-        }
-    }' "$search_file" \
-        | jq -R -s 'split("\n")[:-1]' > "$results_file"
+        # Format folder part
+        # Format folder part to match original display style
+        case "$emu_folder" in
+            *"("*)
+                # Folder has parens like 'FC (Japan)': extract just '(Japan' as prefix
+                # Output will be '(Japan) Name' matching original awk format
+                folder_prefix="$(printf '%s' "$emu_folder" | sed 's/.*(/(/; s/)$//')" ;;
+            *)
+                folder_prefix="$emu_folder" ;;
+        esac
+
+        # Check if favorited
+        rel_path="${filepath#$SDCARD_PATH/}"
+        badge=""
+        if [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH" 2>/dev/null; then
+            badge="★ "
+        fi
+
+        echo "${badge}${folder_prefix}) ${name}" >>"$formatted_file"
+    done <"$search_file"
+
+    jq -R -s 'split("\n")[:-1]' <"$formatted_file" >"$results_file"
+    rm -f "$formatted_file"
 }
 
 get_rom_alias() {
