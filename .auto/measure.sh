@@ -82,7 +82,7 @@ for var in COLLECTIONS_PATH RECENTS_PATH FAVORITES_LABEL FAVORITES_PATH; do
   fi
 done
 
-# Check that the action menu dynamically shows Add/Remove depending on favorites state
+# Check action flow
 echo "=== Check 6: Action flow integration ==="
 if grep -q "is_favorited" launch.sh; then
   echo "OK: is_favorited helper used for dynamic menu"
@@ -144,15 +144,26 @@ else
   errors=$((errors + 1))
 fi
 
+# Check display formatting uses awk (not the old fragile sed)
+echo "=== Check 11: Display formatting for folder types ==="
+if grep -q "awk.*search_list_file.*results_list_file" launch.sh; then
+  echo "OK: awk-based display formatting for folder+game name"
+else
+  # awk may not appear on same line as both files — check it's used in formatting
+  if grep -q "awk -F/" launch.sh; then
+    echo "OK: awk-based display formatting for folder+game name"
+  else
+    echo "FAIL: awk-based display formatting not found"
+    errors=$((errors + 1))
+  fi
+fi
+
 # Check noise-extension coverage: verify each category is in the grep exclusion
 echo "=== Check 8: Noise extension coverage ==="
 missing=0
-# Extract the grep -Eiv pattern text from filter_game_files function
 filter_line=$(grep -A1 'filter_game_files()' launch.sh | tail -1)
 echo "Filter line: $filter_line"
 
-# Required extension categories (at least one representative per category)
-# Save/state files
 if echo "$filter_line" | grep -q 'sav\|state\|srm\|rtc\|nv'; then
   echo "OK: save/state extensions covered"
 else
@@ -160,7 +171,6 @@ else
   missing=$((missing + 1))
 fi
 
-# Config files
 if echo "$filter_line" | grep -q 'cfg\|conf'; then
   echo "OK: config extensions covered"
 else
@@ -168,7 +178,6 @@ else
   missing=$((missing + 1))
 fi
 
-# Media/image files
 if echo "$filter_line" | grep -q 'png\|jpe\?g\|bmp\|gif\|tif\|webp'; then
   echo "OK: media/image extensions covered"
 else
@@ -176,7 +185,6 @@ else
   missing=$((missing + 1))
 fi
 
-# Metadata/text files
 if echo "$filter_line" | grep -q 'xml\|dat\|txt\|log\|lst\|pdf'; then
   echo "OK: metadata/text extensions covered"
 else

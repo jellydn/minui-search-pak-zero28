@@ -332,10 +332,35 @@ main() {
                     show_message "Could not find any games." 2
                 else
                     : >"$results_list_file"
-                    sed "$search_list_file" \
-                        -e 's/^[^(]*(/(/' \
-                        -e 's/)[^/]*\//) /' \
-                        -e 's/[[:space:]]*$//' \
+                    awk -F/ '
+                    {
+                        # Extract game filename (last field)
+                        game = $NF
+                        # Strip extension
+                        sub(/\.[^.]+$/, "", game)
+                        # Strip region/tags from game name
+                        gsub(/\([^)]*\)/, "", game)
+                        gsub(/\[[^]]*\]/, "", game)
+                        sub(/[[:space:]]*$/, "", game)
+
+                        # Find the emu folder (field after Roms)
+                        for (i = 1; i <= NF; i++) {
+                            if (tolower($i) == "roms") {
+                                folder = $(i+1)
+                                break
+                            }
+                        }
+
+                        if (folder ~ /\(/) {
+                            # Folder has parens: "(emu) game"
+                            sub(/.*\(/, "(", folder)
+                            sub(/\).*/, ")", folder)
+                            print folder " " game
+                        } else {
+                            # No parens: "folder) game"
+                            print folder ") " game
+                        }
+                    }' "$search_list_file" \
                         | jq -R -s 'split("\n")[:-1]' > "$results_list_file"
                 fi
             fi
