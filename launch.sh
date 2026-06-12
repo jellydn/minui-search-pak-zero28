@@ -382,12 +382,42 @@ main() {
     search_list_file="/tmp/search-list"
     results_list_file="/tmp/results-list"
     previous_search_file="$USERDATA_PATH/$PAK_NAME/search-term"
+    search_scope_file="$USERDATA_PATH/$PAK_NAME/search-scope"
     minui_ouptut_file="/tmp/minui-output"
 
     # Initialize files on first launch
     [ -f "$search_list_file" ] || : >"$search_list_file"
     [ -f "$results_list_file" ] || : >"$results_list_file"
     [ -f "$previous_search_file" ] || : >"$previous_search_file"
+    [ -f "$search_scope_file" ] || : >"$search_scope_file"
+
+    # On first launch, let user pick search scope (emu folder or All Systems)
+    scope=$(cat "$search_scope_file")
+    if [ -z "$scope" ]; then
+        scope_list_file="/tmp/scope-list"
+        : >"$scope_list_file"
+        echo "All Systems" >>"$scope_list_file"
+        for scope_folder in "$SDCARD_PATH/Roms"/*/; do
+            [ -d "$scope_folder" ] || continue
+            scope_name="$(basename "$scope_folder")"
+            echo "$scope_name" >>"$scope_list_file"
+        done
+
+        killall minui-presenter >/dev/null 2>&1 || true
+        scope=$(minui-list --file "$scope_list_file" --format text --title "Search in...")
+        exit_code=$?
+        if [ "$exit_code" -ne 0 ]; then
+            return $exit_code
+        fi
+        echo "$scope" >"$search_scope_file"
+    fi
+
+    # Determine search root
+    if [ "$scope" = "All Systems" ]; then
+        search_root="$SDCARD_PATH/Roms"
+    else
+        search_root="$SDCARD_PATH/Roms/$scope"
+    fi
 
     while true; do
         search_term=$(cat "$previous_search_file")
@@ -397,7 +427,7 @@ main() {
 
             # Get search term
             killall minui-presenter >/dev/null 2>&1 || true
-            minui-keyboard --title "Search" --initial-value "$search_term" --show-hardware-group --write-location "$minui_ouptut_file" --disable-auto-sleep 
+            minui-keyboard --title "Search ($scope)" --initial-value "$search_term" --show-hardware-group --write-location "$minui_ouptut_file" --disable-auto-sleep 
             exit_code=$?
             if [ "$exit_code" -eq 2 ] || [ "$exit_code" -eq 3 ]; then
                 return $exit_code
@@ -419,7 +449,7 @@ main() {
                 show_message "Searching..."
 
                 search_pattern=$(escape_glob "$search_term")
-                find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
+                find "$search_root" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
                 total=$(wc -l < "$search_list_file")
 
                 if [ "$total" -eq 0 ]; then
@@ -435,7 +465,7 @@ main() {
         total=$(wc -l < "$search_list_file")
         if [ "$total" -gt 0 ]; then
             killall minui-presenter >/dev/null 2>&1 || true
-            minui-list --file "$results_list_file" --format json --write-location "$minui_ouptut_file" --write-value state --disable-auto-sleep --action-button "X" --action-text "EXIT"  --title "Search: $search_term ($total results)"
+            minui-list --file "$results_list_file" --format json --write-location "$minui_ouptut_file" --write-value state --disable-auto-sleep --action-button "X" --action-text "EXIT"  --title "Search ($scope): $search_term ($total results)"
             exit_code=$?
             if [ "$exit_code" -eq 0 ]; then
                 output=$(cat "$minui_ouptut_file")
