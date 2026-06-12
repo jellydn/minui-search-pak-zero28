@@ -382,56 +382,56 @@ browse_favorites() {
         return 0
     fi
 
-    # Build paired file: tab-separated path + display name
-    paired_file="/tmp/browse-favorites-paired"
-    : >"$paired_file"
+    while true; do
+        # Rebuild paired file each iteration (in case favorites changed)
+        paired_file="/tmp/browse-favorites-paired"
+        : >"$paired_file"
 
-    while IFS= read -r fav_path; do
-        [ -z "$fav_path" ] && continue
-        full_path="$SDCARD_PATH/$fav_path"
-        [ -f "$full_path" ] || continue
-        display=$(format_favorite_line "$full_path")
-        printf '%s|%s\n' "$full_path" "$display" >>"$paired_file"
-    done <"$FAVORITES_PATH"
+        while IFS= read -r fav_path; do
+            [ -z "$fav_path" ] && continue
+            full_path="$SDCARD_PATH/$fav_path"
+            [ -f "$full_path" ] || continue
+            display=$(format_favorite_line "$full_path")
+            printf '%s|%s\n' "$full_path" "$display" >>"$paired_file"
+        done <"$FAVORITES_PATH"
 
-    if [ ! -s "$paired_file" ]; then
-        show_message "No valid files in $FAVORITES_LABEL." 2
-        return 0
-    fi
-
-    # Extract just the display column for the list
-    display_file="/tmp/browse-favorites-display"
-    cut -d'|' -f2- "$paired_file" >"$display_file"
-
-    killall minui-presenter >/dev/null 2>&1 || true
-    selected=$(minui-list --file "$display_file" --format text --title "$FAVORITES_LABEL Collection")
-    exit_code=$?
-    rm -f "$display_file"
-    if [ "$exit_code" -ne 0 ]; then
-        rm -f "$paired_file"
-        return 0
-    fi
-
-    # Find the matching line by display name (display is 2nd field)
-    selected_file=""
-    while IFS='|' read -r filepath display; do
-        if [ "$display" = "$selected" ]; then
-            selected_file="$filepath"
-            break
+        if [ ! -s "$paired_file" ]; then
+            rm -f "$paired_file"
+            show_message "No valid files in $FAVORITES_LABEL." 2
+            return 0
         fi
-    done <"$paired_file"
 
-    rm -f "$paired_file"
+        # Extract just the display column for the list
+        display_file="/tmp/browse-favorites-display"
+        cut -d'|' -f2- "$paired_file" >"$display_file"
 
-    if [ -z "$selected_file" ] || [ ! -f "$selected_file" ]; then
-        return 0
-    fi
+        killall minui-presenter >/dev/null 2>&1 || true
+        selected=$(minui-list --file "$display_file" --format text --title "$FAVORITES_LABEL Collection")
+        exit_code=$?
+        rm -f "$display_file"
+        if [ "$exit_code" -ne 0 ]; then
+            # User pressed B — exit the favorites browser
+            rm -f "$paired_file"
+            return 0
+        fi
 
-    emu_name=$(get_emu_name "$(get_emu_folder "$selected_file")")
-    emu_path=$(get_emu_path "$emu_name")
-    rom_alias=$(get_rom_alias "$selected_file")
+        # Find the matching file path by display name
+        selected_file=""
+        while IFS='|' read -r filepath display; do
+            if [ "$display" = "$selected" ]; then
+                selected_file="$filepath"
+                break
+            fi
+        done <"$paired_file"
+        rm -f "$paired_file"
 
-    show_game_actions "$selected_file" "$rom_alias" "$emu_path" "$emu_name"
+        if [ -n "$selected_file" ] && [ -f "$selected_file" ]; then
+            emu_name=$(get_emu_name "$(get_emu_folder "$selected_file")")
+            emu_path=$(get_emu_path "$emu_name")
+            rom_alias=$(get_rom_alias "$selected_file")
+            show_game_actions "$selected_file" "$rom_alias" "$emu_path" "$emu_name"
+        fi
+    done
 }
 
 main() {
