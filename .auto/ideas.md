@@ -45,3 +45,22 @@ Extended `launch.sh` with:
 ### Search term persistence
 - Moved `previous_search_file` from `/tmp/search-term` to `$USERDATA_PATH/$PAK_NAME/search-term`
 - Users see their last search term on relaunch
+
+### Results preserved after delete
+- `format_results()` extracted as reusable function
+- After deleting a game, remaining results are regenerated instead of blank
+- grep -Fxv removes single entry from search_list_file
+
+### Temp file initialization
+- `[ -f ... ] || : > ...` guards for search_list_file, results_list_file,
+  previous_search_file to prevent cat errors on first launch
+
+### Dead code cleanup
+- Removed commented-out `#echo hi`, `#return` lines from keyboard/list exit branches
+- All shellcheck levels (warning + info) pass at zero
+
+### Deferred ideas still open
+- **Search within emulator folders**: Allow user to scope search to a specific emu folder
+- **Favorites badge in results**: Show a ★ next to already-favorited games
+- **Batch delete / multi-select**: From search results
+- **Collections browser**: From search, let user open and browse Favorites
