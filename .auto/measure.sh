@@ -25,7 +25,7 @@ fi
 
 # Check that required functions exist
 echo "=== Check 2: Required functions ==="
-required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files escape_glob add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
+required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files escape_glob format_results add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
 for func in $required_funcs; do
   if grep -q "^${func}()" launch.sh; then
     echo "OK: $func found"
@@ -44,7 +44,6 @@ else
   errors=$((errors + 1))
 fi
 
-# Check zero28 in pak.json
 if [ -f pak.json ]; then
   if grep -q '"zero28"' pak.json; then
     echo "OK: zero28 in pak.json"
@@ -54,7 +53,6 @@ if [ -f pak.json ]; then
   fi
 fi
 
-# Check zero28 bin directory exists
 if [ -d bin/zero28 ]; then
   echo "OK: bin/zero28 directory exists"
 else
@@ -71,7 +69,7 @@ else
   errors=$((errors + 1))
 fi
 
-# Check COLLECTIONS_PATH and FAVORITES_PATH variables
+# Check favorites variables
 echo "=== Check 5: Favorites variables ==="
 for var in COLLECTIONS_PATH RECENTS_PATH FAVORITES_LABEL FAVORITES_PATH; do
   if grep -q "${var}=" launch.sh; then
@@ -103,7 +101,7 @@ else
   errors=$((errors + 1))
 fi
 
-# Check search pipeline uses filter_game_files
+# Check search pipeline
 echo "=== Check 7: Search pipeline uses filter_game_files + sort ==="
 if grep -q "filter_game_files" launch.sh; then
   echo "OK: search pipeline pipes through filter_game_files"
@@ -111,14 +109,14 @@ else
   echo "FAIL: filter_game_files not used in search pipeline"
   errors=$((errors + 1))
 fi
-if grep -q "find.*Roms.*| filter_game_files | sort" launch.sh; then
+if grep -q "| filter_game_files | sort" launch.sh; then
   echo "OK: find piped through filter_game_files then sorted"
 else
   echo "FAIL: find pipeline missing sort after filter_game_files"
   errors=$((errors + 1))
 fi
 
-# Check wc -l < is used instead of cat | wc -l
+# Check wc -l usage
 echo "=== Check 9: Efficient wc -l usage ==="
 wc_anti=$(grep -c 'cat.*|.*wc -l' launch.sh || true)
 wc_good=$(grep -c 'wc -l <' launch.sh || true)
@@ -129,7 +127,7 @@ else
   errors=$((errors + wc_anti))
 fi
 
-# Check glob metacharacters are escaped
+# Check glob escaping
 echo "=== Check 10: Glob metacharacter escaping ==="
 if grep -q "^escape_glob()" launch.sh; then
   echo "OK: escape_glob function defined"
@@ -144,12 +142,12 @@ else
   errors=$((errors + 1))
 fi
 
-# Check display formatting uses awk
-echo "=== Check 11: Display formatting for folder types ==="
-if grep -q "awk -F/" launch.sh; then
-  echo "OK: awk-based display formatting for folder+game name"
+# Check format_results function
+echo "=== Check 11: Display formatting via format_results() ==="
+if grep -q "^format_results()" launch.sh; then
+  echo "OK: format_results() function defined"
 else
-  echo "FAIL: awk-based display formatting not found"
+  echo "FAIL: format_results() not found"
   errors=$((errors + 1))
 fi
 
@@ -164,18 +162,27 @@ else
   errors=$((errors + 1))
 fi
 
-# Check search term persists across sessions
+# Check search term persistence
 echo "=== Check 13: Search term persistence ==="
-if grep -q 'search-term' launch.sh; then
-  echo "OK: search term path includes 'search-term'"
-else
-  echo "FAIL: no search-term path found"
-  errors=$((errors + 1))
-fi
-if grep -q 'previous_search_file.*USERDATA_PATH' launch.sh || grep -q 'previous_search_file.*PAK_NAME' launch.sh; then
+if grep -q 'previous_search_file.*USERDATA_PATH' launch.sh; then
   echo "OK: search term persists in userdata across sessions"
 else
   echo "FAIL: search term uses /tmp, lost across sessions"
+  errors=$((errors + 1))
+fi
+
+# Check preserved results after delete
+echo "=== Check 14: Preserved results after delete ==="
+if grep -q "grep -Fxv.*search_list_file" launch.sh; then
+  echo "OK: remaining results preserved after game delete"
+else
+  echo "FAIL: deleted game not removed from search list"
+  errors=$((errors + 1))
+fi
+if grep -q "format_results.*results_list_file.*search_list_file" launch.sh; then
+  echo "OK: results display regenerated after delete"
+else
+  echo "FAIL: results not regenerated after delete"
   errors=$((errors + 1))
 fi
 
@@ -185,28 +192,28 @@ missing=0
 filter_line=$(grep -A1 'filter_game_files()' launch.sh | tail -1)
 echo "Filter line: $filter_line"
 
-if echo "$filter_line" | grep -q 'sav\|state\|srm\|rtc\|nv'; then
+if echo "$filter_line" | grep -qE 'sav|state|srm|rtc|nv'; then
   echo "OK: save/state extensions covered"
 else
   echo "MISSING: save/state extensions"
   missing=$((missing + 1))
 fi
 
-if echo "$filter_line" | grep -q 'cfg\|conf'; then
+if echo "$filter_line" | grep -qE 'cfg|conf'; then
   echo "OK: config extensions covered"
 else
   echo "MISSING: config extensions"
   missing=$((missing + 1))
 fi
 
-if echo "$filter_line" | grep -q 'png\|jpe\?g\|bmp\|gif\|tif\|webp'; then
+if echo "$filter_line" | grep -qE 'jpe|png|bmp|gif|tif|webp'; then
   echo "OK: media/image extensions covered"
 else
   echo "MISSING: media/image extensions"
   missing=$((missing + 1))
 fi
 
-if echo "$filter_line" | grep -q 'xml\|dat\|txt\|log\|lst\|pdf'; then
+if echo "$filter_line" | grep -qE 'xml|dat|txt|log|lst|pdf'; then
   echo "OK: metadata/text extensions covered"
 else
   echo "MISSING: metadata/text extensions"

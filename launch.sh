@@ -65,6 +65,51 @@ escape_glob() {
     printf '%s' "$1" | sed 's/\[/\\[/g; s/\]/\\]/g; s/\*/\\*/g; s/?/\\?/g'
 }
 
+# Generate the formatted results_list_file from search_list_file
+# Each line becomes "(emu_name) game_title" or "folder) game_title"
+format_results() {
+    results_file="$1"
+    search_file="$2"
+
+    total=$(wc -l < "$search_file")
+    if [ "$total" -eq 0 ]; then
+        : >"$results_file"
+        return 0
+    fi
+
+    : >"$results_file"
+    awk -F/ '
+    {
+        # Extract game filename (last field)
+        game = $NF
+        # Strip extension
+        sub(/\.[^.]+$/, "", game)
+        # Strip region/tags from game name
+        gsub(/\([^)]*\)/, "", game)
+        gsub(/\[[^]]*\]/, "", game)
+        sub(/[[:space:]]*$/, "", game)
+
+        # Find the emu folder (field after Roms)
+        for (i = 1; i <= NF; i++) {
+            if (tolower($i) == "roms") {
+                folder = $(i+1)
+                break
+            }
+        }
+
+        if (folder ~ /\(/) {
+            # Folder has parens: "(emu) game"
+            sub(/.*\(/, "(", folder)
+            sub(/\).*/, ")", folder)
+            print folder " " game
+        } else {
+            # No parens: "folder) game"
+            print folder ") " game
+        }
+    }' "$search_file" \
+        | jq -R -s 'split("\n")[:-1]' > "$results_file"
+}
+
 get_rom_alias() {
     filepath="$1"
     filename="$(basename "$filepath")"
@@ -204,13 +249,12 @@ delete_game() {
     show_message "$pretty_name deleted." 3
 
     # Remove the deleted file from the search list so remaining results show
-    # Use grep -F to treat the path as a literal string (not a regex pattern)
     if [ -f "$search_list_file" ]; then
         grep -Fxv "$file" "$search_list_file" > "${search_list_file}.tmp" 2>/dev/null
         mv "${search_list_file}.tmp" "$search_list_file"
     fi
-    # Clear formatted results so they are regenerated on next display
-    : >"$results_list_file"
+    # Regenerate formatted results with the updated list
+    format_results "$results_list_file" "$search_list_file"
 }
 
 show_game_actions() {
@@ -335,37 +379,7 @@ main() {
                 if [ "$total" -eq 0 ]; then
                     show_message "Could not find any games." 2
                 else
-                    : >"$results_list_file"
-                    awk -F/ '
-                    {
-                        # Extract game filename (last field)
-                        game = $NF
-                        # Strip extension
-                        sub(/\.[^.]+$/, "", game)
-                        # Strip region/tags from game name
-                        gsub(/\([^)]*\)/, "", game)
-                        gsub(/\[[^]]*\]/, "", game)
-                        sub(/[[:space:]]*$/, "", game)
-
-                        # Find the emu folder (field after Roms)
-                        for (i = 1; i <= NF; i++) {
-                            if (tolower($i) == "roms") {
-                                folder = $(i+1)
-                                break
-                            }
-                        }
-
-                        if (folder ~ /\(/) {
-                            # Folder has parens: "(emu) game"
-                            sub(/.*\(/, "(", folder)
-                            sub(/\).*/, ")", folder)
-                            print folder " " game
-                        } else {
-                            # No parens: "folder) game"
-                            print folder ") " game
-                        }
-                    }' "$search_list_file" \
-                        | jq -R -s 'split("\n")[:-1]' > "$results_list_file"
+                    format_results "$results_list_file" "$search_list_file"
                 fi
             fi
         fi
