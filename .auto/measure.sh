@@ -25,7 +25,7 @@ fi
 
 # Check that required functions exist
 echo "=== Check 2: Required functions ==="
-required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files escape_glob format_results add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
+required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files escape_glob format_results execute_search add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
 for func in $required_funcs; do
   if grep -q "^${func}()" launch.sh; then
     echo "OK: $func found"
@@ -237,6 +237,46 @@ if grep -q "Browse.*FAVORITES_LABEL" launch.sh; then
   echo "OK: Browse Favorites option in main menu"
 else
   echo "FAIL: Browse Favorites option missing"
+  errors=$((errors + 1))
+fi
+
+# Check execute_search is used
+if grep -q "^execute_search()" launch.sh; then
+  echo "OK: execute_search function used"
+else
+  echo "FAIL: execute_search function missing"
+  errors=$((errors + 1))
+fi
+
+# Check badge refresh after add/remove
+if grep -q "format_results.*results_list_file.*search_list_file" launch.sh; then
+  echo "OK: format_results called for badge refresh"
+else
+  echo "FAIL: format_results not called for badge refresh"
+  errors=$((errors + 1))
+fi
+
+# Check exec failed restore
+if grep -q "exec failed" launch.sh; then
+  echo "OK: exec failed restore present"
+else
+  echo "FAIL: exec failed restore missing"
+  errors=$((errors + 1))
+fi
+
+# Check first_launch guard
+if grep -q "first_launch=false" launch.sh; then
+  echo "OK: first_launch guard present"
+else
+  echo "FAIL: first_launch guard missing"
+  errors=$((errors + 1))
+fi
+
+# Check LC_ALL=C sort
+if grep -q "LC_ALL=C.*sort" launch.sh; then
+  echo "OK: LC_ALL=C sort locale set"
+else
+  echo "FAIL: LC_ALL=C sort locale missing"
   errors=$((errors + 1))
 fi
 
