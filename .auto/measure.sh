@@ -25,7 +25,7 @@ fi
 
 # Check that required functions exist
 echo "=== Check 2: Required functions ==="
-required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
+required_funcs="load_settings show_confirm is_favorited add_to_favorites remove_from_favorites delete_game show_game_actions filter_game_files escape_glob add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
 for func in $required_funcs; do
   if grep -q "^${func}()" launch.sh; then
     echo "OK: $func found"
@@ -127,6 +127,21 @@ if [ "$wc_anti" -eq 0 ] && [ "$wc_good" -ge 3 ]; then
 else
   echo "FAIL: $wc_anti cat | wc -l anti-patterns remain"
   errors=$((errors + wc_anti))
+fi
+
+# Check glob metacharacters are escaped in search pipeline
+echo "=== Check 10: Glob metacharacter escaping ==="
+if grep -q "escape_glob" launch.sh; then
+  echo "OK: escape_glob function defined"
+else
+  echo "FAIL: escape_glob function missing"
+  errors=$((errors + 1))
+fi
+if grep -q "escape_glob.*search_term" launch.sh; then
+  echo "OK: search_term escaped via escape_glob before find"
+else
+  echo "FAIL: search_term not escaped before find"
+  errors=$((errors + 1))
 fi
 
 # Check noise-extension coverage: verify each category is in the grep exclusion

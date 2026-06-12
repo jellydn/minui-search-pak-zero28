@@ -59,6 +59,12 @@ filter_game_files() {
     grep -Eiv '\.(txt|log|sav|srm|state|fsstate|rtc|nv|cfg|conf|png|jpe?g|bmp|gif|tif|webp|xml|dat|lst|pdf)$'
 }
 
+escape_glob() {
+    # Escape glob metacharacters so find -iname treats them literally
+    # Escapes: [ ] * ?
+    printf '%s' "$1" | sed 's/\[/\\[/g; s/\]/\\]/g; s/\*/\\*/g; s/?/\\?/g'
+}
+
 get_rom_alias() {
     filepath="$1"
     filename="$(basename "$filepath")"
@@ -318,7 +324,8 @@ main() {
             else
                 show_message "Searching..."
 
-                find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files | sort -f > "$search_list_file"
+                search_pattern=$(escape_glob "$search_term")
+                find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
                 total=$(wc -l < "$search_list_file")
 
                 if [ "$total" -eq 0 ]; then
