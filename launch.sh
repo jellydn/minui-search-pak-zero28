@@ -404,7 +404,7 @@ browse_favorites() {
 
         if [ ! -s "$paired_file" ]; then
             rm -f "$paired_file"
-            show_message "No valid files in $FAVORITES_LABEL." 2
+            # All favorites were removed by previous action — silently return
             return 0
         fi
 
