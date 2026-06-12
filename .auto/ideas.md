@@ -30,3 +30,18 @@ Extended `launch.sh` with:
 - **Collections browser**: From search, let user open and browse their Favorites collection
 - **Favorites badge in results**: Show a ★ or icon next to already-favorited games in results list
 - **Case-insensitive sort locale**: Consider `LC_ALL=C.UTF-8 sort -f` if CJK characters are present
+
+### Display formatting for all folder types
+- Replaced fragile sed pipeline with awk that handles:
+  - Folders with parens (e.g., `FC (Japan)` → `(Japan) game`)
+  - Flat folders (e.g., `SFC` → `SFC) game`)
+  - Strips extension and region tags from game name
+
+### Stay-awake lifecycle fix
+- Removed premature `rm -f /tmp/stay_awake` from main loop (broke wake lock for non-Launch actions)
+- Added `echo "1" >/tmp/stay_awake` restore on emulator launch failure
+- Now only Launch + exec path removes stay_awake
+
+### Search term persistence
+- Moved `previous_search_file` from `/tmp/search-term` to `$USERDATA_PATH/$PAK_NAME/search-term`
+- Users see their last search term on relaunch
