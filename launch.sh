@@ -584,8 +584,7 @@ main() {
             minui-list --file "$results_list_file" --format json --write-location "$minui_ouptut_file" --write-value state --disable-auto-sleep --action-button "X" --action-text "EXIT"  --title "Search ($scope): $search_term ($total results)"
             exit_code=$?
             if [ "$exit_code" -eq 0 ]; then
-                output=$(cat "$minui_ouptut_file")
-                selected_index="$(echo "$output" | jq -r '.selected')"
+                selected_index="$(jq -r '.selected' <"$minui_ouptut_file")"
                 file=$(sed -n "$((selected_index + 1))p" "$search_list_file")
 
                 emu_name=$(get_emu_name "$(get_emu_folder "$file")")
