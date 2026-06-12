@@ -347,9 +347,15 @@ show_game_actions() {
             ;;
         "Add to Favorites")
             add_to_favorites "$file"
+            if [ -f "$results_list_file" ] && [ -f "$search_list_file" ]; then
+                format_results "$results_list_file" "$search_list_file"
+            fi
             ;;
         "Remove from Favorites")
             remove_from_favorites "$file"
+            if [ -f "$results_list_file" ] && [ -f "$search_list_file" ]; then
+                format_results "$results_list_file" "$search_list_file"
+            fi
             ;;
         "Delete Game")
             delete_game "$file"
