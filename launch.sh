@@ -53,6 +53,12 @@ add_game_to_recents() {
     mv "/tmp/recent.txt" "$RECENTS_PATH"
 }
 
+# Filter out non-ROM file extensions (saves, states, configs, media, metadata, playlists)
+# Only passes through actual game/ROM files
+filter_game_files() {
+    grep -Eiv '\.(txt|log|sav|srm|state|fsstate|rtc|nv|cfg|conf|png|jpe?g|bmp|gif|tif|webp|xml|dat|lst|pdf)$'
+}
+
 get_rom_alias() {
     filepath="$1"
     filename="$(basename "$filepath")"
@@ -274,7 +280,7 @@ main() {
             # Perform search
             show_message "Searching..."
 
-            find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" ! -name '*.txt' ! -name '*.log' > "$search_list_file"
+            find "$SDCARD_PATH/Roms" -type f ! -path '*/\.*' -iname "*$search_term*" | filter_game_files > "$search_list_file"
             total=$(cat "$search_list_file" | wc -l)
 
             if [ "$total" -eq 0 ]; then

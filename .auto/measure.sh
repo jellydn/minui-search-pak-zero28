@@ -8,6 +8,7 @@ cd "$PAK_DIR"
 
 errors=0
 shellcheck_warnings=0
+noise_gaps=0
 
 # Check shellcheck
 echo "=== Check 1: Shellcheck ==="
@@ -24,7 +25,7 @@ fi
 
 # Check that required functions exist
 echo "=== Check 2: Required functions ==="
-required_funcs="load_settings show_confirm add_to_favorites delete_game show_game_actions add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
+required_funcs="load_settings show_confirm add_to_favorites delete_game show_game_actions filter_game_files add_game_to_recents get_rom_alias get_emu_folder get_emu_name get_emu_path show_message"
 for func in $required_funcs; do
   if grep -q "^${func}()" launch.sh; then
     echo "OK: $func found"
@@ -90,11 +91,70 @@ else
   errors=$((errors + 1))
 fi
 
+# Check search pipeline uses filter_game_files
+echo "=== Check 7: Search pipeline uses filter_game_files ==="
+if grep -q "filter_game_files" launch.sh; then
+  echo "OK: search pipeline pipes through filter_game_files"
+else
+  echo "FAIL: filter_game_files not used in search pipeline"
+  errors=$((errors + 1))
+fi
+if grep -q "find.*Roms.*| filter_game_files" launch.sh; then
+  echo "OK: find piped directly to filter_game_files"
+else
+  echo "FAIL: filter_game_files not piped from find in search pipeline"
+  errors=$((errors + 1))
+fi
+
+# Check noise-extension coverage: verify each category is in the grep exclusion
+echo "=== Check 8: Noise extension coverage ==="
+missing=0
+# Extract the grep -Eiv pattern text from filter_game_files function
+filter_line=$(grep -A1 'filter_game_files()' launch.sh | tail -1)
+echo "Filter line: $filter_line"
+
+# Required extension categories (at least one representative per category)
+# Save/state files
+if echo "$filter_line" | grep -q 'sav\|state\|srm\|rtc\|nv'; then
+  echo "OK: save/state extensions covered"
+else
+  echo "MISSING: save/state extensions (sav, srm, state, rtc)"
+  missing=$((missing + 1))
+fi
+
+# Config files
+if echo "$filter_line" | grep -q 'cfg\|conf'; then
+  echo "OK: config extensions covered"
+else
+  echo "MISSING: config extensions (cfg, conf)"
+  missing=$((missing + 1))
+fi
+
+# Media/image files
+if echo "$filter_line" | grep -q 'png\|jpe\?g\|bmp\|gif\|tif\|webp'; then
+  echo "OK: media/image extensions covered"
+else
+  echo "MISSING: media/image extensions (png, jpg, bmp, gif)"
+  missing=$((missing + 1))
+fi
+
+# Metadata/text files
+if echo "$filter_line" | grep -q 'xml\|dat\|txt\|log\|lst\|pdf'; then
+  echo "OK: metadata/text extensions covered"
+else
+  echo "MISSING: metadata/text extensions (xml, dat, txt, log)"
+  missing=$((missing + 1))
+fi
+
+noise_gaps=$missing
+echo "Noise extension gaps: $noise_gaps"
+
 echo ""
 echo "METRIC shellcheck_warnings=$shellcheck_warnings"
-echo "METRIC coverage_gaps=$errors"
-if [ "$errors" -gt 0 ]; then
-  echo "FAILED: $errors issues found"
+echo "METRIC search_noise_gaps=$noise_gaps"
+echo "METRIC coverage_gaps=$((errors + noise_gaps))"
+if [ "$errors" -gt 0 ] || [ "$noise_gaps" -gt 0 ]; then
+  echo "FAILED: $errors errors, $noise_gaps noise gaps found"
   exit 1
 fi
 echo "PASSED: All checks passed"
