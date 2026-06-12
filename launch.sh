@@ -525,6 +525,7 @@ main() {
 
                 if [ "$menu_choice" = "Browse $FAVORITES_LABEL" ]; then
                     browse_favorites
+                    first_launch=false
                     continue
                 fi
             fi
