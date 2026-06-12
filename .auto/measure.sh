@@ -186,6 +186,39 @@ else
   errors=$((errors + 1))
 fi
 
+# Check search scope
+echo "=== Check 15: Search scope feature ==="
+if grep -q "search_scope_file" launch.sh; then
+  echo "OK: search scope persisted in USERDATA_PATH"
+else
+  echo "FAIL: search scope not persisted"
+  errors=$((errors + 1))
+fi
+if grep -q 'find "\$search_root"' launch.sh || grep -q 'find "\$search_root' launch.sh; then
+  echo "OK: find uses scoped search_root"
+else
+  echo "FAIL: find not using search_root"
+  errors=$((errors + 1))
+fi
+if grep -q "Search (\$scope)" launch.sh || grep -q "Search (\(\$scope\)" launch.sh; then
+  echo "OK: scope shown in search keyboard title"
+else
+  echo "FAIL: scope not in keyboard title"
+  errors=$((errors + 1))
+fi
+if grep -q "CURRENT_SCOPE" launch.sh; then
+  echo "OK: CURRENT_SCOPE global variable defined"
+else
+  echo "FAIL: CURRENT_SCOPE not defined"
+  errors=$((errors + 1))
+fi
+if grep -q "tolower(raw_folder)" launch.sh; then
+  echo "OK: redundant folder prefix suppressed when scoped to single system"
+else
+  echo "FAIL: redundant folder prefix not suppressed"
+  errors=$((errors + 1))
+fi
+
 # Check noise-extension coverage
 echo "=== Check 8: Noise extension coverage ==="
 missing=0

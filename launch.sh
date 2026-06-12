@@ -25,6 +25,7 @@ COLLECTIONS_PATH="$SDCARD_PATH/Collections"
 FAVORITES_LABEL="Favorites"
 FAVORITES_PATH="$COLLECTIONS_PATH/1) $FAVORITES_LABEL.txt"
 RECENTS_PATH="$SDCARD_PATH/.userdata/shared/.minui/recent.txt"
+CURRENT_SCOPE=""
 
 load_settings() {
     config_file="$PAK_DIR/config.json"
@@ -70,6 +71,7 @@ escape_glob() {
 format_results() {
     results_file="$1"
     search_file="$2"
+    scope_name="${3:-$CURRENT_SCOPE}"
 
     total=$(wc -l < "$search_file")
     if [ "$total" -eq 0 ]; then
@@ -78,7 +80,7 @@ format_results() {
     fi
 
     # Single awk pipeline: extract emu folder, format name, check favorites, add badge
-    awk -v sdcard="$SDCARD_PATH" -v fav="$FAVORITES_PATH" '
+    awk -v sdcard="$SDCARD_PATH" -v fav="$FAVORITES_PATH" -v scopename="$scope_name" '
     BEGIN {
         # Load favorites into associative array (normalize to relative paths)
         if (fav != "") {
@@ -121,15 +123,16 @@ format_results() {
         gsub(/[[:space:]]*$/, "", game)
 
         # Find the emu folder (field right after "Roms")
-        folder = ""
+        raw_folder = ""
         for (i = 1; i <= n; i++) {
             if (tolower(parts[i]) == "roms") {
-                folder = parts[i+1]
+                raw_folder = parts[i+1]
                 break
             }
         }
 
         # Format folder prefix: extract content inside parens
+        folder = raw_folder
         if (index(folder, "(") > 0) {
             sub(/.*\(/, "", folder)
             sub(/\).*/, "", folder)
@@ -142,7 +145,12 @@ format_results() {
             badge = "\xe2\x98\x85 "
         }
 
-        print badge folder ") " game
+        if (scopename != "" && scopename != "All Systems" && tolower(raw_folder) == tolower(scopename)) {
+            # Scoped to this system: omit redundant folder prefix
+            print badge game
+        } else {
+            print badge folder ") " game
+        }
     }' "$search_file" | jq -R -s 'split("\n")[:-1]' > "$results_file"
 }
 
@@ -411,6 +419,7 @@ main() {
         fi
         echo "$scope" >"$search_scope_file"
     fi
+    CURRENT_SCOPE="$scope"
 
     # Determine search root
     if [ "$scope" = "All Systems" ]; then
