@@ -55,19 +55,15 @@ add_game_to_recents() {
 }
 
 # Filter out non-ROM file extensions (saves, states, configs, media, metadata)
-# Only passes through actual game/ROM files
 filter_game_files() {
     grep -Eiv '\.(txt|log|sav|srm|state|fsstate|rtc|nv|cfg|conf|png|jpe?g|bmp|gif|tif|webp|xml|dat|lst|pdf)$'
 }
 
 escape_glob() {
     # Escape glob metacharacters so find -iname treats them literally
-    # Escapes: [ ] * ?
     printf '%s' "$1" | sed 's/\[/\\[/g; s/\]/\\]/g; s/\*/\\*/g; s/?/\\?/g'
 }
 
-# Generate the formatted results_list_file from search_list_file
-# Each line becomes "(emu_name) game_title" or "folder) game_title"
 format_results() {
     results_file="$1"
     search_file="$2"
@@ -79,18 +75,14 @@ format_results() {
         return 0
     fi
 
-    # Single awk pipeline: extract emu folder, format name, check favorites, add badge
     awk -v sdcard="$SDCARD_PATH" -v fav="$FAVORITES_PATH" -v scopename="$scope_name" '
     BEGIN {
-        # Load favorites into associative array (normalize to relative paths)
         if (fav != "") {
             while ((getline line < fav) > 0) {
-                # Strip leading /<sdcard> prefix if present for matching
                 norm = line
                 if (index(line, sdcard) == 1) {
                     norm = substr(line, length(sdcard) + 2)
                 }
-                # Also strip leading slash if present
                 if (index(norm, "/") == 1) {
                     norm = substr(norm, 2)
                 }
@@ -101,8 +93,6 @@ format_results() {
     }
     {
         path = $0
-
-        # Build relative path for favorites lookup (no leading /)
         rel = path
         if (index(path, sdcard) == 1) {
             rel = substr(path, length(sdcard) + 2)
@@ -110,19 +100,13 @@ format_results() {
         if (index(rel, "/") == 1) {
             rel = substr(rel, 2)
         }
-
-        # Extract game filename (last field)
         n = split(path, parts, "/")
         game = parts[n]
-
-        # Strip extension
         sub(/\.[^.]+$/, "", game)
-        # Strip region/tags from game name
         gsub(/\([^)]*\)/, "", game)
         gsub(/\[[^]]*\]/, "", game)
         gsub(/[[:space:]]*$/, "", game)
 
-        # Find the emu folder (field right after "Roms")
         raw_folder = ""
         for (i = 1; i <= n; i++) {
             if (tolower(parts[i]) == "roms") {
@@ -130,8 +114,6 @@ format_results() {
                 break
             }
         }
-
-        # Format folder prefix: extract content inside parens
         folder = raw_folder
         if (index(folder, "(") > 0) {
             sub(/.*\(/, "", folder)
@@ -139,19 +121,46 @@ format_results() {
             folder = "(" folder
         }
 
-        # Build badge
         badge = ""
         if (rel in favs) {
             badge = "\xe2\x98\x85 "
         }
 
         if (scopename != "" && scopename != "All Systems" && tolower(raw_folder) == tolower(scopename)) {
-            # Scoped to this system: omit redundant folder prefix
             print badge game
         } else {
             print badge folder ") " game
         }
     }' "$search_file" | jq -R -s 'split("\n")[:-1]' > "$results_file"
+}
+
+# Execute a search and save to history, returns 0 if results found
+execute_search() {
+    search_term="$1"
+    search_root_dir="$2"
+
+    if [ -z "$search_term" ]; then
+        return 1
+    fi
+
+    search_pattern=$(escape_glob "$search_term")
+    find "$search_root_dir" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
+    total=$(wc -l < "$search_list_file")
+
+    if [ "$total" -eq 0 ]; then
+        return 1
+    fi
+
+    format_results "$results_list_file" "$search_list_file"
+
+    # Save to history (deduped, max 10)
+    grep -Fx "$search_term" "$search_history_file" >/dev/null 2>&1 || {
+        printf '%s\n' "$search_term" >>"$search_history_file"
+        tail -10 "$search_history_file" >"${search_history_file}.tmp"
+        mv "${search_history_file}.tmp" "$search_history_file"
+    }
+
+    return 0
 }
 
 get_rom_alias() {
@@ -165,13 +174,11 @@ get_rom_alias() {
 get_emu_folder() {
     filepath="$1"
     roms="$SDCARD_PATH/Roms"
-
     echo "${filepath#"$roms/"}" | cut -d'/' -f1
 }
 
 get_emu_name() {
     emu_folder="$1"
-
     echo "$emu_folder" | sed 's/.*(\([^)]*\)).*/\1/'
 }
 
@@ -230,13 +237,11 @@ show_confirm() {
 is_favorited() {
     file="$1"
     rel_path="${file#"$SDCARD_PATH/"}"
-
     [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH"
 }
 
 add_to_favorites() {
     file="$1"
-
     rel_path="${file#"$SDCARD_PATH/"}"
 
     mkdir -p "$COLLECTIONS_PATH"
@@ -254,7 +259,6 @@ add_to_favorites() {
 
 remove_from_favorites() {
     file="$1"
-
     rel_path="${file#"$SDCARD_PATH/"}"
 
     if [ -f "$FAVORITES_PATH" ] && grep -Fxq "$rel_path" "$FAVORITES_PATH"; then
@@ -271,7 +275,6 @@ remove_from_favorites() {
 
 delete_game() {
     file="$1"
-
     rel_path="${file#"$SDCARD_PATH/"}"
 
     if ! show_confirm "Delete $(basename "$file")?"; then
@@ -280,7 +283,6 @@ delete_game() {
 
     rm -f "$file"
 
-    # Remove from favorites if present
     if [ -f "$FAVORITES_PATH" ]; then
         grep -Fxv "$rel_path" "$FAVORITES_PATH" > "${FAVORITES_PATH}.tmp" 2>/dev/null
         mv "${FAVORITES_PATH}.tmp" "$FAVORITES_PATH"
@@ -292,12 +294,10 @@ delete_game() {
     pretty_name=$(basename "$file" | sed -e 's/([^()]*)//g' -e 's/\[[^]]*\]//g')
     show_message "$pretty_name deleted." 3
 
-    # Remove the deleted file from the search list so remaining results show
     if [ -f "$search_list_file" ]; then
         grep -Fxv "$file" "$search_list_file" > "${search_list_file}.tmp" 2>/dev/null
         mv "${search_list_file}.tmp" "$search_list_file"
     fi
-    # Regenerate formatted results with the updated list
     format_results "$results_list_file" "$search_list_file"
 }
 
@@ -351,7 +351,6 @@ show_game_actions() {
             delete_game "$file"
             ;;
         *)
-            # Cancel - do nothing
             ;;
     esac
 }
@@ -361,7 +360,6 @@ cleanup() {
     killall minui-presenter >/dev/null 2>&1 || true
 }
 
-# Format a single favorite line for display: "emu_name) pretty_name"
 format_favorite_line() {
     filepath="$1"
     filename="$(basename "$filepath")"
@@ -383,7 +381,6 @@ browse_favorites() {
     fi
 
     while true; do
-        # Rebuild paired file each iteration (in case favorites changed)
         paired_file="/tmp/browse-favorites-paired"
         : >"$paired_file"
 
@@ -401,7 +398,6 @@ browse_favorites() {
             return 0
         fi
 
-        # Extract just the display column for the list
         display_file="/tmp/browse-favorites-display"
         cut -d'|' -f2- "$paired_file" >"$display_file"
 
@@ -410,12 +406,10 @@ browse_favorites() {
         exit_code=$?
         rm -f "$display_file"
         if [ "$exit_code" -ne 0 ]; then
-            # User pressed B — exit the favorites browser
             rm -f "$paired_file"
             return 0
         fi
 
-        # Find the matching file path by display name
         selected_file=""
         while IFS='|' read -r filepath display; do
             if [ "$display" = "$selected" ]; then
@@ -467,14 +461,12 @@ main() {
     search_history_file="$USERDATA_PATH/$PAK_NAME/search-history"
     minui_ouptut_file="/tmp/minui-output"
 
-    # Initialize files on first launch
     [ -f "$search_list_file" ] || : >"$search_list_file"
     [ -f "$results_list_file" ] || : >"$results_list_file"
     [ -f "$previous_search_file" ] || : >"$previous_search_file"
     [ -f "$search_scope_file" ] || : >"$search_scope_file"
     [ -f "$search_history_file" ] || : >"$search_history_file"
 
-    # On first launch, let user pick search scope (emu folder or All Systems)
     scope=$(cat "$search_scope_file")
     if [ -z "$scope" ]; then
         scope_list_file="/tmp/scope-list"
@@ -496,7 +488,6 @@ main() {
     fi
     CURRENT_SCOPE="$scope"
 
-    # Determine search root
     if [ "$scope" = "All Systems" ]; then
         search_root="$SDCARD_PATH/Roms"
     else
@@ -511,7 +502,6 @@ main() {
         total=$(wc -l < "$search_list_file")
         if [ "$total" -eq 0 ]; then
 
-            # Show main menu only on app start
             if [ "$first_launch" = true ]; then
                 main_menu_file="/tmp/main-menu"
                 : >"$main_menu_file"
@@ -552,30 +542,15 @@ main() {
                 fi
 
                 if [ "$history_choice" != "New Search..." ]; then
-                    search_term="$history_choice"
-                    echo "$search_term" >"$previous_search_file"
-                    show_message "Searching..."
-
-                    search_pattern=$(escape_glob "$search_term")
-                    find "$search_root" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
-                    total=$(wc -l < "$search_list_file")
-
-                    if [ "$total" -eq 0 ]; then
-                        show_message "Could not find any games." 2
+                    if execute_search "$history_choice" "$search_root"; then
+                        : # results ready
                     else
-                        format_results "$results_list_file" "$search_list_file"
+                        show_message "Could not find any games." 2
                     fi
-                    # Save even from history replay
-                    grep -Fx "$search_term" "$search_history_file" >/dev/null 2>&1 || {
-                        printf '%s\n' "$search_term" >>"$search_history_file"
-                        tail -10 "$search_history_file" >"${search_history_file}.tmp"
-                        mv "${search_history_file}.tmp" "$search_history_file"
-                    }
                     continue
                 fi
             fi
 
-            # Get search term
             killall minui-presenter >/dev/null 2>&1 || true
             minui-keyboard --title "Search ($scope)" --initial-value "$search_term" --show-hardware-group --write-location "$minui_ouptut_file" --disable-auto-sleep 
             exit_code=$?
@@ -586,37 +561,21 @@ main() {
                 return 1
             fi
             search_term=$(cat "$minui_ouptut_file")
-            # Trim whitespace
             search_term=$(printf '%s' "$search_term" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             echo "$search_term" > "$previous_search_file"
 
-            # Perform search
             if [ -z "$search_term" ]; then
                 show_message "Please enter a search term." 2
                 : >"$search_list_file"
                 : >"$results_list_file"
             else
-                show_message "Searching..."
-
-                search_pattern=$(escape_glob "$search_term")
-                find "$search_root" -type f ! -path '*/\.*' -iname "*$search_pattern*" | filter_game_files | sort -f > "$search_list_file"
-                total=$(wc -l < "$search_list_file")
-
-                if [ "$total" -eq 0 ]; then
-                    show_message "Could not find any games." 2
+                if execute_search "$search_term" "$search_root"; then
+                    : # results ready
                 else
-                    format_results "$results_list_file" "$search_list_file"
-                    # Save to search history (deduped, max 10)
-                    grep -Fx "$search_term" "$search_history_file" >/dev/null 2>&1 || {
-                        printf '%s\n' "$search_term" >>"$search_history_file"
-                        tail -10 "$search_history_file" >"${search_history_file}.tmp"
-                        mv "${search_history_file}.tmp" "$search_history_file"
-                    }
+                    show_message "Could not find any games." 2
                 fi
             fi
         fi
-
-        # Display Results
 
         total=$(wc -l < "$search_list_file")
         if [ "$total" -gt 0 ]; then
