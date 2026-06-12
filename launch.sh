@@ -341,6 +341,9 @@ show_game_actions() {
             add_game_to_recents "$file" "$rom_alias"
             killall minui-presenter >/dev/null 2>&1 || true
             exec "$emu_path" "$file"
+            # exec failed — restore stay_awake
+            echo "1" >/tmp/stay_awake
+            show_message "Could not launch $rom_alias." 2
             ;;
         "Add to Favorites")
             add_to_favorites "$file"
